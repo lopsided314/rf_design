@@ -125,6 +125,7 @@ def analyze_sections(
         f"  Ni   = {sgc_str.sdBm(start.Ni)} dBm/Hz "
         f"({sgc_str.sdBm(start.Ni * BW)} dBm/{BW_str})"
     )
+    
     reports.append(
         f"  No   = {sgc_str.sdBm(end.No)} dBm/Hz "
         f"({sgc_str.sdBm(end.No * BW)} dBm/{BW_str})"
