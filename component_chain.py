@@ -23,11 +23,11 @@ Typical usage example:
 import copy
 from typing import Sequence
 
-import signal_chain.components as rf_component
+from signal_chain import components as sgc_components
 from signal_chain import noise_figure
 
-import signal_chain.utils.signal_chain_math as sgc_math
-import signal_chain.utils.str_format as sgc_str
+from signal_chain.utils import signal_chain_math as sgc_math
+from signal_chain.utils import str_format as sgc_str
 
 
 class ComponentChain(noise_figure.NoiseFigureStage):
@@ -39,7 +39,7 @@ class ComponentChain(noise_figure.NoiseFigureStage):
     No values stored in dB.
 
     Attributes:
-        components (list[rf_component.RFComponent]): container of component sequence
+        components (list[sgc_comp.RFComponent]): container of component sequence
         G (float): Total Gain of sequence
         F (float): Total Noise Factor of sequence
         Te (float): effective noise temperate of component sequence
@@ -55,7 +55,7 @@ class ComponentChain(noise_figure.NoiseFigureStage):
     """
 
     def __init__(
-        self, components: Sequence[rf_component.RFComponent], desc: str
+        self, components: Sequence[sgc_components.RFComponent], desc: str
     ) -> None:
         """Create a component chain object.
 
@@ -70,13 +70,13 @@ class ComponentChain(noise_figure.NoiseFigureStage):
         if len(components) == 0:
             raise ValueError("Cannot have component chain with no components")
 
-        self.components: list[rf_component.RFComponent] = list(
+        self.components: list[sgc_components.RFComponent] = list(
             copy.deepcopy(components)
         )
         self.desc: str = desc
 
-        self._G_accum, self._F_accum = noise_figure.cascade_G_F(self.components)
-        self.G, self.F = self._G_accum[-1], self._F_accum[-1]
+        G_cas, F_cas = noise_figure.cascade_G_F(self.components)
+        self.G, self.F = G_cas[-1], F_cas[-1]
         self.Te = sgc_math.Te(self.F)
 
         self.Si: float = sgc_math.DBM_INIT
@@ -92,7 +92,7 @@ class ComponentChain(noise_figure.NoiseFigureStage):
         """Set the signal and noise inputs to the section and compute its output.
 
         Args:
-            Si (float): Input signal power (W)  
+            Si (float): Input signal power (W)
             Ni (float): Input noise power spectral density (W/Hz)
             BW (float): Bandwidth to use for SNR calculation (Hz)
         """
@@ -116,22 +116,26 @@ class ComponentChain(noise_figure.NoiseFigureStage):
 
         Generate multi-line string that displays properties of the component
         chain as well as the calculated outputs.
-        
+
         Returns:
             str: Printable format of the component chain properties.
         """
         first, last = self.components[0], self.components[-1]
-        ret = (f"'{self.desc}' totals:\n"
-               f"  G     = {sgc_str.sdB(self.G)} dB\n"
-               f"  NF    = {sgc_str.sdB(self.F)} dB\n"
-               f"  Si    = {sgc_str.sdBm(first.Si)} dBm\n"
-               f"  So    = {sgc_str.sdBm(last.So)} dBm\n"
-               f"  Ni    = {sgc_str.sdBm(first.Ni)} dBm/Hz\n"
-               f"  No    = {sgc_str.sdBm(last.No)} dBm/Hz\n"
-               f"  SNR_i = {sgc_str.sdB(first.SNR_i)} dB\n"
-               f"  SNR_o = {sgc_str.sdB(last.SNR_o)} dB\n")
+        ret = (
+            f"'{self.desc}' totals:\n"
+            f"  G     = {sgc_str.sdB(self.G)} dB\n"
+            f"  NF    = {sgc_str.sdB(self.F)} dB\n"
+            f"  Si    = {sgc_str.sdBm(first.Si)} dBm\n"
+            f"  So    = {sgc_str.sdBm(last.So)} dBm\n"
+            f"  Ni    = {sgc_str.sdBm(first.Ni)} dBm/Hz\n"
+            f"  No    = {sgc_str.sdBm(last.No)} dBm/Hz\n"
+            f"  SNR_i = {sgc_str.sdB(first.SNR_i)} dB\n"
+            f"  SNR_o = {sgc_str.sdB(last.SNR_o)} dB\n"
+        )
+
         if self.warnings:
-            ret += "\n".join("  Warning: " + w for w in self.warnings) + "\n"
+            ret += "\n".join(f"  Warning: {w}" for w in self.warnings) + "\n"
+
         return ret
 
 
@@ -150,7 +154,9 @@ class Coax(ComponentChain):
         length (float): The length of the cable, in units matching the loss term.
     """
 
-    def __init__(self, loss_per_unit_len_dB: float, length: float, desc: str = "") -> None:
+    def __init__(
+        self, loss_per_unit_len_dB: float, length: float, desc: str = ""
+    ) -> None:
         """Create a coax model object.
 
         Args:
@@ -162,7 +168,8 @@ class Coax(ComponentChain):
         self.length: float = length
         if not desc:
             desc = "coax"
-        super().__init__((rf_component.Loss(self.loss_per_dB * length),), desc)
+
+        super().__init__((sgc_components.Loss(self.loss_per_dB * length),), desc)
 
     def __str__(self) -> str:
         """Printable output.
@@ -173,3 +180,21 @@ class Coax(ComponentChain):
         total_loss = f"{sgc_math.dB(self.G):.2f}"
         breakdown = f"({self.length}*{self.loss_per_dB})"
         return f"{total_loss} {breakdown} dB from coax '{self.desc}'\n"
+
+
+class GenericChain(ComponentChain):
+    """Generic component chain.
+
+    Easy way to add a section with known parameters without having to manually
+    make a component chain with a single generic component.
+
+    """
+    def __init__(self, gain_dB: float, NF_dB: float, desc: str):
+        super().__init__(
+            components=(
+                sgc_components.RFComponent(
+                    gain_dB=gain_dB, NF_dB=NF_dB, VSWR=1, Pin_warn_dBm=999, desc=""
+                ),
+            ),
+            desc=desc,
+        )

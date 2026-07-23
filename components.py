@@ -26,7 +26,7 @@ Typical usage example:
 """
 
 from signal_chain import noise_figure
-import signal_chain.utils.signal_chain_math as sgc_math
+from signal_chain.utils import signal_chain_math as sgc_math
 
 
 class RFComponent(noise_figure.NoiseFigureStage):
@@ -182,15 +182,3 @@ def Loss(
         RFComponent: Generic component with the parameters of the described lossy component.
     """
     return RFComponent(-loss_dB, loss_dB, VSWR, Pin_warn_dBm, desc)
-
-
-def AttnPad(loss_dB: float) -> RFComponent:
-    """Construct a component representing an ideal attenuator pad.
-
-    Args:
-        loss_dB (float): component power loss, in dB
-
-    Returns:
-        RFComponent: Generic component with the parameters of the described attenuator.
-    """
-    return RFComponent(-loss_dB, loss_dB, 1, 999, f"{loss_dB:.0f} dB pad")

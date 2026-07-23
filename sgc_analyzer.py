@@ -8,14 +8,13 @@ Typical usage:
 """
 
 import copy
+import inspect
 from typing import Sequence
 
 from signal_chain import component_chain
 from signal_chain import noise_figure
-import signal_chain.utils.signal_chain_math as sgc_math
-import signal_chain.utils.str_format as sgc_str
-
-import inspect
+from signal_chain.utils import signal_chain_math as sgc_math
+from signal_chain.utils import str_format as sgc_str
 
 
 def analyze_sections(
@@ -125,7 +124,6 @@ def analyze_sections(
         f"  Ni   = {sgc_str.sdBm(start.Ni)} dBm/Hz "
         f"({sgc_str.sdBm(start.Ni * BW)} dBm/{BW_str})"
     )
-    
     reports.append(
         f"  No   = {sgc_str.sdBm(end.No)} dBm/Hz "
         f"({sgc_str.sdBm(end.No * BW)} dBm/{BW_str})"

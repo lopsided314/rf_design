@@ -1,10 +1,13 @@
 """Helper functions to format number printouts."""
 
-import signal_chain.utils.signal_chain_math as sgc_math
+from signal_chain.utils import signal_chain_math as sgc_math
 
 
 def _f72(f: float) -> str:
     """Put float through predefined f-string.
+
+    Padding value chosen to maintain alignment, without scientific notation,
+    for values in the range [-999.99, 999.99].
 
     Args:
         f (float): Number to format.
