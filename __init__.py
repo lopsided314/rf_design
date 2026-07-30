@@ -1,6 +1,6 @@
 """Base imports for signal chain library."""
 
-from signal_chain import noise_figure as sgc_nf
+from signal_chain import noise_figure
 from signal_chain import sgc_analyzer as analysis
 
 from signal_chain.components import RFComponent, Amp, Mixer, Loss

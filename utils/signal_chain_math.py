@@ -1,5 +1,4 @@
-""" Helper functions for common operations required by signal chain math.
-"""
+"""Helper functions for common operations required by signal chain math."""
 
 import math
 
@@ -14,7 +13,7 @@ T0 = 290  # K
 BOLTZMANN = 1.380649e-23
 
 # Thermal NPSD (-174 dBm/Hz)
-kT0 = BOLTZMANN*T0
+kT0 = BOLTZMANN * T0
 
 
 def dB(x: float) -> float:
@@ -75,11 +74,10 @@ def undBm(x: float) -> float:
 
 
 #
-# Initialization values for variables that get converted
-# back into dB/dBm when printing. This prevents arithmetic
-# errors if inputs haven't been specified while providing
-# a clear indication in the report that the values are
-# placeholders.
+# Initialization values for variables that get converted back
+# into dB/dBm when printing. This prevents arithmetic errors if
+# inputs haven't been specified and provides a clear indication
+# in the report that the values are placeholders.
 #
 DB_INIT = undB(-999.99)
 DBM_INIT = undBm(-999.99)
@@ -87,7 +85,7 @@ DBM_INIT = undBm(-999.99)
 
 def Te(F: float) -> float:
     """Calculate effective noise temperature from noise factor.
-    
+
     https://en.wikipedia.org/wiki/Noise_temperature
 
     Args:
@@ -104,7 +102,7 @@ def mismatch_loss_dB(VSWR: float) -> float:
 
     An interface with an impedance mismatch will result
     in standing waves due to reflections. This function
-    calculates the extra insertion loss caused by the 
+    calculates the extra insertion loss caused by the
     reflections.
 
     Args:
@@ -116,9 +114,10 @@ def mismatch_loss_dB(VSWR: float) -> float:
     refl_coeff = (VSWR - 1) / (VSWR + 1)
     return dB(1 - refl_coeff**2)
 
+
 def return_loss_to_VSWR(rl: float) -> float:
     """Calculate the VSWR from the return loss.
-    
+
     Calculate the standing wave ratio from the
     return loss.
 
@@ -128,4 +127,4 @@ def return_loss_to_VSWR(rl: float) -> float:
     Returns:
         float: VSWR
     """
-    return (1 + 10**(-rl/20)) / (1 - 10**(-rl/20))
+    return (1 + 10 ** (-rl / 20)) / (1 - 10 ** (-rl / 20))

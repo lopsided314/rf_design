@@ -75,6 +75,7 @@ def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[list[float], list[f
 
     if len(stages) == 0:
         raise ValueError("Calculations require one or more stages")
+
     if not all(s.valid() for s in stages):
         raise ValueError("Stage has invalid or uninitialized parameters")
 

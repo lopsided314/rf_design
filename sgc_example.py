@@ -29,8 +29,8 @@ def example() -> None:
     # perform analysis with desired inputs
     sgc_analyzer.analyze_sections(
         sections=sections,
-        Pin_dBm=-82.8,
+        Pin_dBm=-82.77,
         BW_MHz=10,
-        Tin=150,
+        noise_spec=("Tin", 150),
         filename="sgc_example.txt",
     )

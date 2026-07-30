@@ -59,7 +59,7 @@ def parse_lossy(
 
 def read_catalog(filename: str) -> dict[str, rf_component.RFComponent]:
     """Open the parts catalog json given by filename and generate"""
-    with open(filename, "r") as f:
+    with open(filename) as f:
         catalog = json.load(f)
 
     components: dict[str, rf_component.RFComponent] = {}

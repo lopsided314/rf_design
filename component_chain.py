@@ -23,7 +23,7 @@ Typical usage example:
 import copy
 from typing import Sequence
 
-from signal_chain import components as sgc_components
+from signal_chain import components as sgc_comp
 from signal_chain import noise_figure
 
 from signal_chain.utils import signal_chain_math as sgc_math
@@ -39,79 +39,63 @@ class ComponentChain(noise_figure.NoiseFigureStage):
     No values stored in dB.
 
     Attributes:
-        components (list[sgc_comp.RFComponent]): container of component sequence
+        components (list[sgc_comp.RFComponent]): contains sequence of RF components
         G (float): Total Gain of sequence
         F (float): Total Noise Factor of sequence
-        Te (float): effective noise temperate of component sequence
-        Si (float): Input signal power (W)
-        So (float): Output signal power (W)
-        Ni (float): Input noise power spectral density (W/Hz)
-        No (float): Output noise power spectral density (W/Hz)
-        SNR_i (float): SNR at sequence input
-        SNR_o (float): SNR at sequence output
-
+        Gees (list[float]): Cumulative Gain of components
+        Effs (list[float]): Cumulative Noise Factor of components
+        rf_in (sgc_comp.RFSignal): Input RF Signal
+        rf_out (sgc_comp.RFSignal): Output RF Signal
         desc (str): brief description
         warnings (list[str]): warning messages generated during computation
     """
 
-    def __init__(
-        self, components: Sequence[sgc_components.RFComponent], desc: str
-    ) -> None:
+    def __init__(self, components: Sequence[sgc_comp.RFComponent], desc: str) -> None:
         """Create a component chain object.
 
         Args:
-            components (Sequence[RFComponent]): ordered sequence of RF components
+            components (Sequence[sgc_comp.RFComponent]): ordered sequence of RF components
             desc (str): brief description of component chain
 
         Raises:
             ValueError: No components were provided
         """
-        super().__init__()
         if len(components) == 0:
             raise ValueError("Cannot have component chain with no components")
 
-        self.components: list[sgc_components.RFComponent] = list(
-            copy.deepcopy(components)
-        )
+        self.components: list[sgc_comp.RFComponent] = list(copy.deepcopy(components))
         self.desc: str = desc
 
-        G_cas, F_cas = noise_figure.cascade_G_F(self.components)
-        self.G, self.F = G_cas[-1], F_cas[-1]
-        self.Te = sgc_math.Te(self.F)
+        self.Gees, self.Effs = noise_figure.cascade_G_F(self.components)
+        super().__init__(self.Gees[-1], self.Effs[-1])
 
-        self.Si: float = sgc_math.DBM_INIT
-        self.So: float = sgc_math.DBM_INIT
-        self.Ni: float = sgc_math.DBM_INIT
-        self.No: float = sgc_math.DBM_INIT
-        self.SNR_i: float = sgc_math.DB_INIT
-        self.SNR_o: float = sgc_math.DB_INIT
+        self.rf_in: sgc_comp.RFSignal = sgc_comp.RFSignal()
+        self.rf_out: sgc_comp.RFSignal = sgc_comp.RFSignal()
 
         self.warnings: list[str] = []
 
-    def set_input(self, Si: float, Ni: float, BW: float) -> None:
+    def set_input(self, rf_in: sgc_comp.RFSignal) -> sgc_comp.RFSignal:
         """Set the signal and noise inputs to the section and compute its output.
 
         Args:
-            Si (float): Input signal power (W)
-            Ni (float): Input noise power spectral density (W/Hz)
-            BW (float): Bandwidth to use for SNR calculation (Hz)
+            rf_in (sgc_comp.RFSignal): Input signal
+
+        Returns:
+            sgc_comp.RFSignal: The output of this chain when rf_in is the input
         """
 
-        self.Si = Si
-        self.Ni = Ni
-        self.SNR_i = Si / (BW * Ni)
-
-        self.components[0].set_input(Si, Ni, BW)
-        for c_prev, c_next in zip(self.components[:-1], self.components[1:]):
-            c_next.set_input(c_prev.So, c_prev.No, BW)
-
-        self.So = self.components[-1].So
-        self.No = self.components[-1].No
-        self.SNR_o = self.So / (BW * self.No)
+        rf_out = rf_in
+        for component in self.components:
+            rf_out = component.set_input(rf_out)
 
         self.warnings = [c.warning for c in self.components if c.warning]
 
-    def status(self) -> str:
+        self.rf_in = rf_in
+        self.rf_out = rf_out
+
+        return rf_out
+
+    def status(self, BW: float) -> str:
         """Formatted printable string.
 
         Generate multi-line string that displays properties of the component
@@ -120,17 +104,19 @@ class ComponentChain(noise_figure.NoiseFigureStage):
         Returns:
             str: Printable format of the component chain properties.
         """
-        first, last = self.components[0], self.components[-1]
+        Si, Ni = self.components[0].rf_in.S, self.components[0].rf_in.N
+        So, No = self.components[-1].rf_out.S, self.components[-1].rf_out.N
+
         ret = (
             f"'{self.desc}' totals:\n"
             f"  G     = {sgc_str.sdB(self.G)} dB\n"
             f"  NF    = {sgc_str.sdB(self.F)} dB\n"
-            f"  Si    = {sgc_str.sdBm(first.Si)} dBm\n"
-            f"  So    = {sgc_str.sdBm(last.So)} dBm\n"
-            f"  Ni    = {sgc_str.sdBm(first.Ni)} dBm/Hz\n"
-            f"  No    = {sgc_str.sdBm(last.No)} dBm/Hz\n"
-            f"  SNR_i = {sgc_str.sdB(first.SNR_i)} dB\n"
-            f"  SNR_o = {sgc_str.sdB(last.SNR_o)} dB\n"
+            f"  Si    = {sgc_str.sdBm(Si)} dBm\n"
+            f"  So    = {sgc_str.sdBm(So)} dBm\n"
+            f"  Ni    = {sgc_str.sdBm(Ni)} dBm/Hz\n"
+            f"  No    = {sgc_str.sdBm(No)} dBm/Hz\n"
+            f"  SNR_i = {sgc_str.sdB(Si/(Ni*BW))} dB\n"
+            f"  SNR_o = {sgc_str.sdB(So/(No*BW))} dB\n"
         )
 
         if self.warnings:
@@ -169,7 +155,10 @@ class Coax(ComponentChain):
         if not desc:
             desc = "coax"
 
-        super().__init__((sgc_components.Loss(self.loss_per_dB * length),), desc)
+        super().__init__(
+            [sgc_comp.Loss(self.loss_per_dB * length, desc="coax")],
+            desc,
+        )
 
     def __str__(self) -> str:
         """Printable output.
@@ -189,11 +178,15 @@ class GenericChain(ComponentChain):
     make a component chain with a single generic component.
 
     """
+
     def __init__(self, gain_dB: float, NF_dB: float, desc: str):
         super().__init__(
             components=(
-                sgc_components.RFComponent(
-                    gain_dB=gain_dB, NF_dB=NF_dB, VSWR=1, Pin_warn_dBm=999, desc=""
+                sgc_comp.RFComponent(
+                    gain_dB=gain_dB,
+                    NF_dB=NF_dB,
+                    Pin_warn_dBm=999,
+                    desc="All",
                 ),
             ),
             desc=desc,
