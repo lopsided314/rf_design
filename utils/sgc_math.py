@@ -6,8 +6,8 @@ import math
 # Physical constants relevant to noise calculations
 #
 
-# Default system temperature
-T0 = 290  # K
+# Default system temperature, in Kelvin
+T0 = 290
 
 # Boltzmann constant
 BOLTZMANN = 1.380649e-23
@@ -73,14 +73,32 @@ def undBm(x: float) -> float:
     return 10 ** ((x - 30) / 10)
 
 
-#
-# Initialization values for variables that get converted back
-# into dB/dBm when printing. This prevents arithmetic errors if
-# inputs haven't been specified and provides a clear indication
-# in the report that the values are placeholders.
-#
-DB_INIT = undB(-999.99)
-DBM_INIT = undBm(-999.99)
+def default_dB() -> float:
+    """
+    Initialization value for variables that get converted back into dB when
+    printing. This prevents arithmetic errors if an RF signal input hasn't been
+    specified, and provides a clear indication in the report that the values
+    are placeholders.
+
+    Returns:
+        float: Linear conversion of -999.99 dB
+    """
+
+    return undB(-999.99)
+
+
+def default_dBm() -> float:
+    """
+    Initialization value for variables that get converted back into dBm when
+    printing. This prevents arithmetic errors if an RF signal input hasn't been
+    specified, and provides a clear indication in the report that the values
+    are placeholders.
+
+    Returns:
+        float: Linear conversion of -999.99 dBm
+    """
+
+    return undBm(-999.99)
 
 
 def Te(F: float) -> float:
@@ -89,7 +107,7 @@ def Te(F: float) -> float:
     https://en.wikipedia.org/wiki/Noise_temperature
 
     Args:
-        F (float): Noise Factor
+        F (float): Noise Factor (not dB)
 
     Returns:
         float: Effective noise temperature, in Kelvin

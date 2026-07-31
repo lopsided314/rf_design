@@ -23,21 +23,12 @@ Typical usage example:
     )
 """
 
-from dataclasses import dataclass
-
-from signal_chain import noise_figure
-from signal_chain.utils import signal_chain_math as sgc_math
-
-
-@dataclass(frozen=True)
-class RFSignal:
-    """Hold the Signal and Noise components of an RF signal."""
-
-    S: float = sgc_math.DBM_INIT  # Signal power (W)
-    N: float = sgc_math.DBM_INIT  # Noise Power Spectral Density (W/Hz)
+from signal_chain.noise_figure import NoiseFigureStage
+from signal_chain.rf_signal import RFSignal
+from signal_chain.utils import sgc_math
 
 
-class RFComponent(noise_figure.NoiseFigureStage):
+class RFComponent(NoiseFigureStage):
     """RFComponent base class.
 
     Attributes:
@@ -108,7 +99,7 @@ class RFComponent(noise_figure.NoiseFigureStage):
         No = max(No, sgc_math.kT0)
 
         self.rf_in = rf_in
-        self.rf_out = RFSignal(rf_in.S * self.G, No)
+        self.rf_out = RFSignal(rf_in.S * self.G, No, rf_in.BW)
 
         return self.rf_out
 

@@ -5,16 +5,18 @@ Tools to make cascaded noise figure computation simpler.
 Typical usage example:
     stages = [
         NoiseFigureStage(10, 2),
-        NoiseFigureStage(-2, 2),
-        NoiseFigureStage(-3, 4),
+        NoiseFigureStage(0.2, 2),
+        NoiseFigureStage(.5, 4),
     ]
     G, F = cascade_G_F(stages)
 """
 
+from dataclasses import dataclass
 import math
 from typing import Sequence
 
 
+@dataclass
 class NoiseFigureStage:
     """Object used in noise figure calculations.
 
@@ -27,24 +29,21 @@ class NoiseFigureStage:
         F (float): noise factor of represented object (not dB)
     """
 
-    def __init__(self, G: float = -1, F: float = -1) -> None:
-        """Initialize stage properties.
+    G: float
+    F: float
+
+    def __post_init__(self) -> None:
+        """Verify parameters are valid.
+
+        Power gain cannot be negative, and Noise Factor cannot be less than one.
 
         Args:
-            G (float, optional): power gain (not dB). Defaults to uninitialized
-            F (float, optional): noise factor (not dB). Defaults to uninitialized
+            G (float): power gain (not dB).
+            F (float): noise factor (not dB).
         """
-        self.G: float = G
-        self.F: float = F
 
-    def valid(self) -> bool:
-        """Determine if the stage has valid parameters.
-
-        Returns:
-            bool: Power gain cannot be negative and Noise Factor
-                  cannot be less than one.
-        """
-        return self.G > 0 and self.F >= 1
+        if self.G < 0 or self.F < 1:
+            raise ValueError("Stage has invalid parameters")
 
 
 def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[list[float], list[float]]:
@@ -75,9 +74,6 @@ def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[list[float], list[f
 
     if len(stages) == 0:
         raise ValueError("Calculations require one or more stages")
-
-    if not all(s.valid() for s in stages):
-        raise ValueError("Stage has invalid or uninitialized parameters")
 
     Gees: list[float] = [s.G for s in stages]
     Effs: list[float] = [s.F for s in stages]

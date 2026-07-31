@@ -1,7 +1,7 @@
 import json
 
-import signal_chain.components as rf_component
-import signal_chain.utils.signal_chain_math as sgc_math
+import signal_chain.rf_component as rf_component
+from  signal_chain.utils import sgc_math
 
 def get_VSWR_param(spec: dict[str, float]) -> float:
     """Find if any of the parameters can be turned into a VSWR."""
@@ -20,7 +20,6 @@ def parse_amp(name: str, spec: dict[str, float]) -> dict[str, rf_component.RFCom
         name: rf_component.Amp(
             gain_dB=spec["Gain dB"],
             NF_dB=spec["Noise Figure dB"],
-            VSWR=get_VSWR_param(spec),
             OP1dB_dBm=spec.get("OP1dB dBm", 999),
             desc=name,
         )
@@ -35,7 +34,6 @@ def parse_mixer(
         name: rf_component.Mixer(
             loss_dB=spec["Conversion Loss dB"],
             NF_dB=spec["Noise Figure dB"],
-            VSWR=get_VSWR_param(spec),
             IP1dB_dBm=spec.get("IP1dB dBm", 999),
             desc=name,
         )
@@ -50,7 +48,6 @@ def parse_lossy(
     return {
         name: rf_component.Loss(
             loss_dB=spec["Insertion Loss dB"],
-            VSWR=get_VSWR_param(spec),
             Pin_warn_dBm=spec.get("Pin Max dBm", 999),
             desc=name,
         )

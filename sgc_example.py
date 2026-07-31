@@ -3,10 +3,9 @@
 Example program showing how to use the signal chain library.
 """
 
-from signal_chain import components as sgc_comp
-from signal_chain.component_chain import ComponentChain
+from signal_chain import rf_component as rf_comp
+from signal_chain.rf_chain import RFChain
 from signal_chain import sgc_analyzer
-
 
 def example() -> None:
     """Demonstrate how to use the signal chain library to analyze a problem.
@@ -15,15 +14,15 @@ def example() -> None:
     """
 
     # make a list of one or more components
-    components: list[sgc_comp.RFComponent] = [
-        sgc_comp.Amp(10, 2, OP1dB_dBm=0, desc="lna"),
-        sgc_comp.Loss(1, desc="bpf"),
-        sgc_comp.Mixer(3, 4, desc="mixer"),
+    components: list[rf_comp.RFComponent] = [
+        rf_comp.Amp(10, 2, OP1dB_dBm=0, desc="lna"),
+        rf_comp.Loss(1, desc="bpf"),
+        rf_comp.Mixer(3, 4, desc="mixer"),
     ]
 
     # make a list of one or more sections
-    sections: list[ComponentChain] = [
-        ComponentChain(desc="Example 10.2", components=components),
+    sections: list[RFChain] = [
+        RFChain(desc="Example 10.2", components=components),
     ]
 
     # perform analysis with desired inputs

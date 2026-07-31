@@ -9,13 +9,15 @@ Typical usage:
 
 import copy
 import inspect
+import textwrap
 from typing import Callable, Sequence
 
-from signal_chain import component_chain as sgc_chain
-from signal_chain import components as sgc_comp
+from signal_chain.rf_chain import RFChain
+from signal_chain.rf_component import RFComponent
+from signal_chain.rf_signal import RFSignal
 from signal_chain import noise_figure
-from signal_chain.utils import signal_chain_math as sgc_math
-from signal_chain.utils import str_format as sgc_str
+from signal_chain.utils import sgc_math
+from signal_chain.utils import sgc_str
 
 
 def _convert_noise_input(
@@ -54,10 +56,9 @@ def _convert_noise_input(
 
 
 def _generate_inlined_text(
-    sections: Sequence[sgc_chain.ComponentChain | sgc_comp.RFComponent],
-    BW: float,
-    Gees: list[float],
-    Effs: list[float],
+    sections: Sequence[RFChain | RFComponent],
+    G_cas: list[float],
+    F_cas: list[float],
 ) -> str:
     """Format signal chain output.
 
@@ -65,9 +66,9 @@ def _generate_inlined_text(
     can be read as they are being changed by each stage. (Bad explanation...)
 
     Args:
-        sections (Sequence[ComponentChain | RFComponent]): sequence of signal chain parts
-        Gees (list[float]): Cascaded gain of signal chain.
-        Effs (list[float]): Cascaded noise factor of signal chain.
+        sections (Sequence[RFChain | RFComponent]): sequence of signal chain parts
+        G_cas (list[float]): Cascaded gain of signal chain.
+        F_cas (list[float]): Cascaded noise factor of signal chain.
 
     Returns:
         str: values formatted into printable string.
@@ -101,10 +102,7 @@ def _generate_inlined_text(
 
     param_widths: list[int] = []
 
-    SNR_0 = sections[0].rf_in.S / (sections[0].rf_in.N * BW)
-    for section, G, F in zip(sections, Gees, Effs):
-        SNR_i = section.rf_in.S / (section.rf_in.N * BW)
-        SNR_o = section.rf_out.S / (section.rf_out.N * BW)
+    for section, G, F in zip(sections, G_cas, F_cas):
 
         param_widths.append(max(len(section.desc), len(sgc_str.sdB(1))))
 
@@ -113,15 +111,17 @@ def _generate_inlined_text(
         stage_params["NF"].append(sgc_str.sdB(section.F))
         stage_params["So"].append(sgc_str.sdBm(section.rf_out.S))
         stage_params["No"].append(sgc_str.sdBm(section.rf_out.N))
-        stage_params["SNRi"].append(sgc_str.sdB(SNR_i))
-        stage_params["SNRo"].append(sgc_str.sdB(SNR_o))
+        stage_params["SNRi"].append(sgc_str.sdB(section.rf_in.SNR))
+        stage_params["SNRo"].append(sgc_str.sdB(section.rf_out.SNR))
 
-        if isinstance(section, sgc_comp.RFComponent):
+        if isinstance(section, RFComponent):
             stage_params["Warning"].append(("WARN" if section.warning else ""))
 
         accum_params["G tot"].append(sgc_str.sdB(G))
         accum_params["NF tot"].append(sgc_str.sdB(F))
-        accum_params["SNR loss"].append(sgc_str.sdB(SNR_0 / SNR_o))
+        accum_params["SNR loss"].append(
+            sgc_str.sdB(sections[0].rf_in.SNR / section.rf_out.SNR)
+        )
 
     lines: list[str] = []
 
@@ -149,7 +149,7 @@ def _generate_inlined_text(
 
 def analyze_sections(
     *,
-    sections: Sequence[sgc_chain.ComponentChain],
+    sections: Sequence[RFChain],
     Pin_dBm: float,
     BW_MHz: float,
     noise_spec: tuple[str, float],
@@ -166,7 +166,7 @@ def analyze_sections(
     defaults to thermal noise, k*T0.
 
     Args:
-        sections (Sequence[ComponentChain]): Sequence of signal chain sections
+        sections (Sequence[RFChain]): Sequence of signal chain sections
         Pin_dBm (float): Input signal power, in dBm
         BW_MHz (float): Bandwidth of signal chain, in MHz
         noise_spec (tuple[str, float]): Specify the input noise. Options:
@@ -181,21 +181,24 @@ def analyze_sections(
         ValueError: There are too many noise parameter inputs
     """
 
-    # get the function inputs so they can be recorded in the output
-    input_args = inspect.getargvalues(inspect.currentframe())[3].items()  # type: ignore
-    input_args = {arg: val for arg, val in input_args if val and arg != "sections"}
-
-    reports: list[str] = [f"{input_args = }\n"]
+    # get the function inputs so they can be recorded in the output report
+    input_args = inspect.getargvalues(inspect.currentframe())[3]  # type: ignore
+    input_args.pop("sections")
+    report: list[str] = [f"{input_args = }\n"]
 
     # input param unit conversion
     BW: float = BW_MHz * 1e6
-    rf_in: sgc_comp.RFSignal = sgc_comp.RFSignal(
-        sgc_math.undBm(Pin_dBm), _convert_noise_input(Pin_dBm, BW, noise_spec)
+
+    # create input signal object
+    rf_in: RFSignal = RFSignal(
+        S=sgc_math.undBm(Pin_dBm),
+        N=_convert_noise_input(Pin_dBm, BW, noise_spec),
+        BW=BW,
     )
 
     if rf_in.N < sgc_math.kT0:
-        reports.append(
-            f"WARNING: Requested input requires noise density below thermal: "
+        report.append(
+            "WARNING: Requested input requires noise density below thermal: "
             f"{sgc_str.sdBm(rf_in.N)} dBm/Hz\n"
         )
 
@@ -210,24 +213,23 @@ def analyze_sections(
         rf_out = section.set_input(rf_out)
 
     # run calculation for full signal chain
-    Gees, Effs = noise_figure.cascade_G_F(sections)
+    G_cas, F_cas = noise_figure.cascade_G_F(sections)
 
     #
     # generate report
     #
     for section in sections:
-        reports.append(f"'{section.desc}' Components:")
-        reports.append(
+        report.append(f"'{section.desc}' Components:")
+        report.append(
             _generate_inlined_text(
                 section.components,
-                BW,
-                section.Gees,
-                section.Effs,
+                section.G_cas,
+                section.F_cas,
             )
         )
-        reports.append("\n" + section.status(BW))
+        report.append("\n" + section.status())
 
-    reports.append("All sections:\n" + _generate_inlined_text(sections, BW, Gees, Effs))
+    report.append("All sections:\n" + _generate_inlined_text(sections, G_cas, F_cas))
 
     if BW >= 1e9:
         BW_str: str = f"{BW/1e9:.2f} GHz"
@@ -238,24 +240,22 @@ def analyze_sections(
     else:
         BW_str: str = f"{BW:.2f} Hz"
 
-    reports.append("\n\nSystem Totals:")
-    reports.append(f"  G    = {sgc_str.sdB(Gees[-1])} dB")
-    reports.append(f"  NF   = {sgc_str.sdB(Effs[-1])} dB")
-    reports.append(f"  Si   = {sgc_str.sdBm(rf_in.S)} dBm")
-    reports.append(f"  So   = {sgc_str.sdBm(rf_out.S)} dBm")
-    reports.append(
-        f"  Ni   = {sgc_str.sdBm(rf_in.N)} dBm/Hz ({sgc_str.sdBm(rf_in.N * BW)} dBm/{BW_str})"
-    )
-    reports.append(
-        f"  No   = {sgc_str.sdBm(rf_out.N)} dBm/Hz ({sgc_str.sdBm(rf_out.N * BW)} dBm/{BW_str})"
-    )
-    reports.append(f"  SNR_i = {sgc_str.sdB(rf_in.S/(rf_in.N * BW))} dB ({BW_str})")
-    reports.append(f"  SNR_o = {sgc_str.sdB(rf_out.S/(rf_out.N * BW))} dB ({BW_str})")
+    report.append(textwrap.dedent(f"""
 
-    report = "\n".join(reports) + "\n"
+        System Totals:
+          G    = {sgc_str.sdB(G_cas[-1])} dB
+          NF   = {sgc_str.sdB(F_cas[-1])} dB
+          Si   = {sgc_str.sdBm(rf_in.S)} dBm
+          So   = {sgc_str.sdBm(rf_out.S)} dBm
+          Ni   = {sgc_str.sdBm(rf_in.N)} dBm/Hz ({sgc_str.sdBm(rf_in.N * rf_in.BW)} dBm/{BW_str})
+          No   = {sgc_str.sdBm(rf_out.N)} dBm/Hz ({sgc_str.sdBm(rf_out.N * rf_out.BW)} dBm/{BW_str})
+          SNR_i = {sgc_str.sdB(rf_in.SNR)} dB ({BW_str})
+          SNR_o = {sgc_str.sdB(rf_out.SNR)} dB ({BW_str})
+
+        """))
 
     if filename:
         with open(filename, "w", encoding="utf-8") as f:
-            f.write(report)
+            f.write("\n".join(report))
     else:
-        print(report)
+        print("\n".join(report))

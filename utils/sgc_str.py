@@ -1,6 +1,6 @@
 """Helper functions to format number printouts."""
 
-from signal_chain.utils import signal_chain_math as sgc_math
+from signal_chain.utils import sgc_math
 
 
 def _f72(f: float) -> str:
