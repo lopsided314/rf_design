@@ -9,7 +9,6 @@ Typical usage:
 
 import copy
 import inspect
-import textwrap
 from typing import Callable, Sequence
 
 from signal_chain.rf_chain import RFChain
@@ -100,11 +99,11 @@ def _generate_inlined_text(
         max(len(param) for param in accum_params),
     )
 
-    param_widths: list[int] = []
+    col_widths: list[int] = []
 
     for section, G, F in zip(sections, G_cas, F_cas):
 
-        param_widths.append(max(len(section.desc), len(sgc_str.sdB(1))))
+        col_widths.append(max(len(section.desc), len(sgc_str.sdB(1))))
 
         stage_params["Name"].append(section.desc)
         stage_params["G"].append(sgc_str.sdB(section.G))
@@ -123,7 +122,7 @@ def _generate_inlined_text(
             sgc_str.sdB(sections[0].rf_in.SNR / section.rf_out.SNR)
         )
 
-    lines: list[str] = []
+    report: list[str] = []
 
     def align_params(params: dict[str, list[str]]) -> list[str]:
         """
@@ -131,20 +130,21 @@ def _generate_inlined_text(
         """
         ret: list[str] = []
         for name, param_strs in params.items():
-            if any(s for s in param_strs):
-                name = name.ljust(param_name_width)
+            if any(param_strs):
 
-                param_strs = [s.rjust(w) for w, s in zip(param_widths, param_strs)]
+                param_strs = [f"{s:>{w}}" for w, s in zip(col_widths, param_strs)]
 
-                ret.append(f"| {name} | {' | '.join(param_strs)} |")
+                ret.append(f"| {name:<{param_name_width}} | {' | '.join(param_strs)} |")
 
         return ret
 
-    lines += align_params(stage_params)
-    lines.append("-" * len(lines[-1]))
-    lines += align_params(accum_params)
+    report += align_params(stage_params)
+    report.insert(0, "-" * len(report[-1]))
+    report.append("-" * len(report[-1]))
+    report += align_params(accum_params)
+    report.append("-" * len(report[-1]))
 
-    return "\n".join(lines)
+    return "\n".join(report)
 
 
 def analyze_sections(
@@ -240,19 +240,20 @@ def analyze_sections(
     else:
         BW_str: str = f"{BW:.2f} Hz"
 
-    report.append(textwrap.dedent(f"""
-
-        System Totals:
-          G    = {sgc_str.sdB(G_cas[-1])} dB
-          NF   = {sgc_str.sdB(F_cas[-1])} dB
-          Si   = {sgc_str.sdBm(rf_in.S)} dBm
-          So   = {sgc_str.sdBm(rf_out.S)} dBm
-          Ni   = {sgc_str.sdBm(rf_in.N)} dBm/Hz ({sgc_str.sdBm(rf_in.N * rf_in.BW)} dBm/{BW_str})
-          No   = {sgc_str.sdBm(rf_out.N)} dBm/Hz ({sgc_str.sdBm(rf_out.N * rf_out.BW)} dBm/{BW_str})
-          SNR_i = {sgc_str.sdB(rf_in.SNR)} dB ({BW_str})
-          SNR_o = {sgc_str.sdB(rf_out.SNR)} dB ({BW_str})
-
-        """))
+    report.append(
+        "\n"
+        "System Totals:\n"
+        f"G    = {sgc_str.sdB(G_cas[-1])} dB\n"
+        f"NF   = {sgc_str.sdB(F_cas[-1])} dB\n"
+        f"Si   = {sgc_str.sdBm(rf_in.S)} dBm\n"
+        f"So   = {sgc_str.sdBm(rf_out.S)} dBm\n"
+        f"Ni   = {sgc_str.sdBm(rf_in.N)} dBm/Hz"
+        f" ({sgc_str.sdBm(rf_in.N * rf_in.BW)} dBm/{BW_str})\n"
+        f"No   = {sgc_str.sdBm(rf_out.N)} dBm/Hz"
+        f" ({sgc_str.sdBm(rf_out.N * rf_out.BW)} dBm/{BW_str})\n"
+        f"SNR_i = {sgc_str.sdB(rf_in.SNR)} dB ({BW_str})\n"
+        f"SNR_o = {sgc_str.sdB(rf_out.SNR)} dB ({BW_str})\n"
+    )
 
     if filename:
         with open(filename, "w", encoding="utf-8") as f:

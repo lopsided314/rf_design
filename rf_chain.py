@@ -21,7 +21,6 @@ Typical usage example:
 """
 
 import copy
-import textwrap
 from typing import Sequence
 
 from signal_chain import noise_figure
@@ -106,18 +105,18 @@ class RFChain(noise_figure.NoiseFigureStage):
         rf_in = self.components[0].rf_in
         rf_out = self.components[-1].rf_out
 
-        return textwrap.dedent(f"""
-            '{self.desc}' totals:
-              G     = {sgc_str.sdB(self.G)} dB
-              NF    = {sgc_str.sdB(self.F)} dB
-              Si    = {sgc_str.sdBm(rf_in.S)} dBm
-              So    = {sgc_str.sdBm(rf_out.S)} dBm
-              Ni    = {sgc_str.sdBm(rf_in.N)} dBm/Hz
-              No    = {sgc_str.sdBm(rf_out.N)} dBm/Hz
-              SNR_i = {sgc_str.sdB(rf_in.SNR)} dB
-              SNR_o = {sgc_str.sdB(rf_out.SNR)} dB
-            {'\n'.join(f'  Warning: {c.warning}' for c in self.components if c.warning)}
-            """)
+        return (
+            f"'{self.desc}' totals:\n"
+            f"  G     = {sgc_str.sdB(self.G)} dB\n"
+            f"  NF    = {sgc_str.sdB(self.F)} dB\n"
+            f"  Si    = {sgc_str.sdBm(rf_in.S)} dBm\n"
+            f"  So    = {sgc_str.sdBm(rf_out.S)} dBm\n"
+            f"  Ni    = {sgc_str.sdBm(rf_in.N)} dBm/Hz\n"
+            f"  No    = {sgc_str.sdBm(rf_out.N)} dBm/Hz\n"
+            f"  SNR_i = {sgc_str.sdB(rf_in.SNR)} dB\n"
+            f"  SNR_o = {sgc_str.sdB(rf_out.SNR)} dB\n"
+            f"{'\n'.join(f'  Warning: {c.warning}' for c in self.components if c.warning)}\n"
+        )
 
 
 class Coax(RFChain):
