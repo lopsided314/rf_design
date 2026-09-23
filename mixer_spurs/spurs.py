@@ -2,12 +2,82 @@ import itertools
 
 import matplotlib.pyplot as plt
 import mplcursors
+import numpy as np
+
+"""Constants taken from the Henderson paper."""
+HENDERSON = np.array(
+    [
+        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+        [np.nan, 0, -41, -28, np.nan, np.nan],
+        [np.nan, -35, -39, -44, np.nan, np.nan],
+        [np.nan, -10, -32, -18, np.nan, np.nan],
+        [np.nan, -35, -39, np.nan, np.nan, np.nan],
+        [np.nan, -14, np.nan, -14, np.nan, np.nan],
+    ]
+)
+
+"""Constants taken from the Marki Microwave online spur calculator.
+
+'L', 'M', 'N', and 'H' represent LO drive levels, specific to their own product
+line - they make a MM1-0320LS and a MM1-0320HS
+
+L = +10 dBm
+M = +13 dBm
+N = +16 dBm
+H = +19 dBm
+
+Arrays are indexed [LO_order, IF_order].
+
+"""
+
+MARKI_TABLES: dict[str, np.ndarray] = {
+    "L": np.array(
+        [
+            [-8.0, -26.0, -39.0, -45.0, -68.0, -59.0],
+            [-8.0, 0.0, -33.0, -28.0, -51.0, -57.0],
+            [-8.0, -26.0, -39.0, -35.0, -58.0, -55.0],
+            [-8.0, -10.0, -23.0, -18.0, -37.0, -43.0],
+            [np.nan, -26.0, -39.0, -21.0, -44.0, -38.0],
+            [np.nan, -14.0, -19.0, -14.0, -20.0, -26.0],
+        ]
+    ),
+    "M": np.array(
+        [
+            [-5.0, -26.0, -39.0, -44.0, -68.0, -59.0],
+            [-5.0, 0.0, -32.0, -28.0, -50.0, -57.0],
+            [-5.0, -26.0, -39.0, -35.0, -58.0, -54.0],
+            [-5.0, -10.0, -23.0, -18.0, -36.0, -43.0],
+            [-5.0, -26.0, -39.0, -21.0, -44.0, -37.0],
+            [-5.0, -14.0, -18.0, -14.0, -19.0, -26.0],
+        ]
+    ),
+    "N": np.array(
+        [
+            [-2.0, -27.0, -39.0, -46.0, -68.0, -60.0],
+            [-2.0, 0.0, -34.0, -28.0, -52.0, -57.0],
+            [-2.0, -27.0, -39.0, -36.0, -58.0, -56.0],
+            [-2.0, -10.0, -24.0, -18.0, -38.0, -43.0],
+            [-2.0, -27.0, -39.0, -22.0, -44.0, -39.0],
+            [-2.0, -14.0, -20.0, -14.0, -21.0, -26.0],
+        ]
+    ),
+    "H": np.array(
+        [
+            [0.0, -26.0, -39.0, -44.0, -68.0, -58.0],
+            [0.0, 0.0, -32.0, -28.0, -50.0, -57.0],
+            [0.0, -26.0, -39.0, -34.0, -58.0, -54.0],
+            [0.0, -10.0, -22.0, -18.0, -36.0, -43.0],
+            [0.0, -26.0, -39.0, -20.0, -44.0, -37.0],
+            [0.0, -14.0, -18.0, -14.0, -19.0, -26.0],
+        ]
+    ),
+}
 
 
 def henderson_table(
     n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float
 ) -> float | None:
-    """Compute Mixer Spur suppression, based on Henderson Model paper."""
+    """Compute Mixer Spur suppression, based on table in Henderson Model paper."""
 
     dP: float = P_RF_dBm - P_LO_dBm
 
@@ -22,11 +92,7 @@ def henderson_table(
         (None, -17.0, None, 2 * dP - 11),
     )
 
-    try:
-        return suppression[n_LO][m_RF]
-    except IndexError:
-        return None
-        # raise ValueError(f"No suppression value for {m_RF=}, {n_LO=}")
+    return suppression[n_LO][m_RF]
 
 
 def marki_calc(n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float) -> float | None:
@@ -34,69 +100,14 @@ def marki_calc(n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float) -> float 
 
     dP: float = P_RF_dBm - P_LO_dBm
 
-    suppression_LO_10dBm_LMixer: tuple[tuple[float, ...], ...] = (
-        (  # LO 0
-            dP - 8,
-            -26,
-            dP - 39,
-            2 * dP - 45,
-            3 * dP - 68,
-            4 * dP - 59,
-        ),
-        (  # LO 1
-            dP - 8,
-            0,
-            dP - 33,
-            2 * dP - 28,
-            3 * dP - 51,
-            4 * dP - 57,
-        ),
-        (  # LO 2
-            dP - 8,
-            -26,
-            dP - 39,
-            2 * dP - 35,
-            3 * dP - 58,
-            4 * dP - 55,
-        ),
-        (  # LO 3
-            dP - 8,
-            -10,
-            dP - 23,
-            2 * dP - 18,
-            3 * dP - 37,
-            4 * dP - 43,
-        ),
-        (  # LO 4
-            dP - 8,
-            -26,
-            dP - 39,
-            2 * dP - 21,
-            3 * dP - 44,
-            4 * dP - 38,
-        ),
-        (  # LO 5
-            dP - 8,
-            -14,
-            dP - 19,
-            2 * dP - 14,
-            3 * dP - 20,
-            4 * dP - 26,
-        ),
-    )
-
-    try:
-        return suppression_LO_10dBm_LMixer[n_LO][m_RF]
-    except IndexError:
-        return None
-        # raise ValueError(f"No suppression value for {m_RF=}, {n_LO=}")
+    return MARKI_TABLES["H"][abs(n_LO), abs(m_RF)] + dP * abs(m_RF - 1)
 
 
 def main(
     input_freqs: tuple[float, float],
     output_freqs: tuple[float, float],
     LO: float,
-    suppression_cutoff: float,
+    supression_cutoff: float,
 ):
     order_multiples = (0,) + tuple(val for x in range(1, 6) for val in (x, -x))
 
@@ -113,12 +124,16 @@ def main(
         ):
             continue
 
-        supression = marki_calc(abs(LO_order), abs(input_order), 0, 10)
-        if supression is not None and suppression_cutoff < supression:
+        supression = marki_calc(abs(LO_order), abs(input_order), 0, 19)
+        if (
+            supression is not None
+            and not np.isnan(supression)
+            and supression >= supression_cutoff
+        ):
             plt.plot(
                 input_freqs,
                 (output_start, output_end),
-                label=f"LO {LO_order} x Input {input_order}: {supression} dBc",
+                label=f"LO {LO_order} x Input {input_order}: {supression:.0f} dBc",
             )
 
     plt.xlim(input_freqs)
@@ -126,11 +141,11 @@ def main(
     plt.xlabel("Input Frequency [GHz]")
     plt.ylabel("Output Frequency [GHz]")
     plt.grid()
-    plt.gca().legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.gca().legend(bbox_to_anchor=(1.05, 1), loc="upper left")  # type: ignore
     plt.tight_layout()
 
     # Activate hover annotations
-    cursor = mplcursors.cursor(plt.gca().axes, hover=True)
+    cursor = mplcursors.cursor(plt.gca().axes, hover=True)  # type: ignore
 
     # Customize the annotation text to show our custom labels
     @cursor.connect("add")
