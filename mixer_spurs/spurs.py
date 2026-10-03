@@ -1,4 +1,5 @@
 import itertools
+import sys
 
 import matplotlib.pyplot as plt
 import mplcursors
@@ -74,28 +75,15 @@ MARKI_TABLES: dict[str, np.ndarray] = {
 }
 
 
-def henderson_table(
-    n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float
-) -> float | None:
+def henderson_table(n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float) -> float:
     """Compute Mixer Spur suppression, based on table in Henderson Model paper."""
 
     dP: float = P_RF_dBm - P_LO_dBm
 
-    suppression: tuple[tuple[float | None, ...], ...] = (
-        (None, None, None, None),
-        (None, 0.0, dP - 41, 2 * dP - 28),
-        (None, -35.0, dP - 44, 2 * dP - 44),
-        (None, -10.0, dP - 32, 2 * dP - 18),
-        (None, -35.0, dP - 39, None),
-        (None, -14.0, None, 2 * dP - 14),
-        (None, -35.0, dP - 39),
-        (None, -17.0, None, 2 * dP - 11),
-    )
-
-    return suppression[n_LO][m_RF]
+    return HENDERSON[abs(n_LO), abs(m_RF)] + dP * abs(m_RF - 1)
 
 
-def marki_calc(n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float) -> float | None:
+def marki_calc(n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float) -> float:
     """Compute Mixer Spur suppression, based on Marki calculator tool."""
 
     dP: float = P_RF_dBm - P_LO_dBm
@@ -103,36 +91,34 @@ def marki_calc(n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float) -> float 
     return MARKI_TABLES["H"][abs(n_LO), abs(m_RF)] + dP * abs(m_RF - 1)
 
 
-def main(
+def plot_spurs(
     input_freqs: tuple[float, float],
     output_freqs: tuple[float, float],
     LO: float,
+    Pdiff: float,
     supression_cutoff: float,
 ):
     order_multiples = (0,) + tuple(val for x in range(1, 6) for val in (x, -x))
 
     order_combos = tuple(itertools.combinations_with_replacement(order_multiples, 2))
 
+    # Make the freq-freq plot
     plt.figure()
 
     for LO_order, input_order in order_combos:
-        output_start = LO * LO_order + input_order * input_freqs[0]
-        output_end = LO * LO_order + input_order * input_freqs[1]
+        mix_start = LO * LO_order + input_order * input_freqs[0]
+        mix_end = LO * LO_order + input_order * input_freqs[1]
 
-        if (output_start < output_freqs[0] and output_end < output_freqs[0]) or (
-            output_start > output_freqs[1] and output_end > output_freqs[1]
+        if (mix_start < output_freqs[0] and mix_end < output_freqs[0]) or (
+            mix_start > output_freqs[1] and mix_end > output_freqs[1]
         ):
             continue
 
-        supression = marki_calc(abs(LO_order), abs(input_order), 0, 19)
-        if (
-            supression is not None
-            and not np.isnan(supression)
-            and supression >= supression_cutoff
-        ):
+        supression = marki_calc(abs(LO_order), abs(input_order), 19 - Pdiff, 19)
+        if not np.isnan(supression) and supression >= supression_cutoff:
             plt.plot(
                 input_freqs,
-                (output_start, output_end),
+                (mix_start, mix_end),
                 label=f"LO {LO_order} x Input {input_order}: {supression:.0f} dBc",
             )
 
@@ -159,4 +145,14 @@ def main(
 
 
 if __name__ == "__main__":
-    main((1, 2), (5, 6), 4, -120)
+    try:
+        if_start = float(input("Input Start: "))
+        if_stop = float(input("Input Stop: "))
+        rf_start = float(input("Output Start: "))
+        rf_stop = float(input("Output Stop: "))
+        power_diff = float(input("Power delta: "))
+    except ValueError as e:
+        print(f"Invalid input: {e}")
+        sys.exit(0)
+
+    plot_spurs((if_start, if_stop), (rf_start, rf_stop), 4, power_diff, -120)
