@@ -1,7 +1,20 @@
+"""RF Mixer Spur Estimation and Visualization.
+
+The goal of this script is to allow visualization of mixer spurs through
+a double-balanced RF mixer. It was inspired by the online calculator tool
+from Marki Microwave. 
+
+Reference: https://markimicrowave.com/technical-resources/tools/spur-calculator/
+
+"""
+
 import itertools
 import sys
+import warnings
 
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 import mplcursors
 import numpy as np
 
@@ -96,16 +109,30 @@ def plot_spurs(
     output_freqs: tuple[float, float],
     LO: float,
     Pdiff: float,
-    supression_cutoff: float,
+    suppression_cutoff: float,
 ):
     order_multiples = (0,) + tuple(val for x in range(1, 6) for val in (x, -x))
 
-    order_combos = tuple(itertools.combinations_with_replacement(order_multiples, 2))
+    spur_levels: list[tuple[int, int, float]] = []
+
+    # compute the spur suppression levels
+    for lo, inp in itertools.combinations_with_replacement(order_multiples, 2):
+        # for now, hard coded for 'H' Marki tables
+        spur = marki_calc(abs(lo), abs(inp), 19 - Pdiff, 19)
+        if np.isnan(spur) or spur < suppression_cutoff:
+            continue
+
+        spur_levels.append((lo, inp, spur))
+
+    spur_levels.sort(key=lambda x: x[2], reverse=True)
 
     # Make the freq-freq plot
-    plt.figure()
+    spur_map_fig, spur_map_ax = plt.subplots(1, 1, squeeze=True)  # type: ignore
 
-    for LO_order, input_order in order_combos:
+    # Make the spectrum output plot
+    spectrum_fig, spectrum_ax = plt.subplots(1, 1, squeeze=True)  # type: ignore
+
+    for LO_order, input_order, spur in spur_levels:
         mix_start = LO * LO_order + input_order * input_freqs[0]
         mix_end = LO * LO_order + input_order * input_freqs[1]
 
@@ -114,24 +141,40 @@ def plot_spurs(
         ):
             continue
 
-        supression = marki_calc(abs(LO_order), abs(input_order), 19 - Pdiff, 19)
-        if not np.isnan(supression) and supression >= supression_cutoff:
-            plt.plot(
-                input_freqs,
-                (mix_start, mix_end),
-                label=f"LO {LO_order} x Input {input_order}: {supression:.0f} dBc",
-            )
+        label = f"LO {LO_order} x Input {input_order}: {spur:.0f} dBc"
 
-    plt.xlim(input_freqs)
-    plt.ylim(output_freqs)
-    plt.xlabel("Input Frequency [GHz]")
-    plt.ylabel("Output Frequency [GHz]")
-    plt.grid()
-    plt.gca().legend(bbox_to_anchor=(1.05, 1), loc="upper left")  # type: ignore
-    plt.tight_layout()
+        spur_map_ax.plot(input_freqs, (mix_start, mix_end), label=label)
+
+        spectrum_ax.plot((mix_start, mix_end), (spur, spur), label=label)
+        spectrum_ax.fill_between(
+            (mix_start, mix_end),
+            suppression_cutoff,
+            y2=spur,  # type: ignore
+            alpha=0.2,
+        )
+
+    spur_map_ax.set_xlim(input_freqs)
+    spur_map_ax.set_ylim(output_freqs)
+    spur_map_ax.set_xlabel("Input Frequency [GHz]")
+    spur_map_ax.set_ylabel("Output Frequency [GHz]")
+    spur_map_ax.grid()
+    spur_map_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    spur_map_fig.tight_layout()
+
+    spectrum_ax.set_xlim(output_freqs)
+    spectrum_ax.set_ylim(suppression_cutoff, 5)
+    spectrum_ax.set_xlabel("Output Frequency [GHz]")
+    spectrum_ax.set_ylabel("Spur Level [dBc]")
+    spectrum_ax.grid()
+    spectrum_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    spectrum_fig.tight_layout()
 
     # Activate hover annotations
-    cursor = mplcursors.cursor(plt.gca().axes, hover=True)  # type: ignore
+    warnings.filterwarnings(
+        action="ignore", message="Pick support for PolyCollection is missing."
+    )
+    cursor = mplcursors.cursor(spur_map_ax.axes, hover=True)  # type: ignore
+    cursor = mplcursors.cursor(spectrum_ax.axes, hover=True)  # type: ignore
 
     # Customize the annotation text to show our custom labels
     @cursor.connect("add")
@@ -145,14 +188,21 @@ def plot_spurs(
 
 
 if __name__ == "__main__":
-    try:
-        if_start = float(input("Input Start: "))
-        if_stop = float(input("Input Stop: "))
-        rf_start = float(input("Output Start: "))
-        rf_stop = float(input("Output Stop: "))
-        power_diff = float(input("Power delta: "))
-    except ValueError as e:
-        print(f"Invalid input: {e}")
-        sys.exit(0)
+    # try:
+    #     if_start = float(input("Input Start: "))
+    #     if_stop = float(input("Input Stop: "))
+    #     rf_start = float(input("Output Start: "))
+    #     rf_stop = float(input("Output Stop: "))
+    #     lo = float(input("LO: "))
+    #     power_diff = float(input("Power delta: "))
+    # except ValueError as e:
+    #     print(f"Invalid input: {e}")
+    #     sys.exit(0)
 
-    plot_spurs((if_start, if_stop), (rf_start, rf_stop), 4, power_diff, -120)
+    if_start = 1
+    if_stop = 1.2
+    rf_start = 6
+    rf_stop = 20
+    lo = 10
+    power_diff = 1
+    plot_spurs((if_start, if_stop), (rf_start, rf_stop), lo, power_diff, -120)
