@@ -34,3 +34,13 @@ two-tone intermodulation is too hard.
 
 This script generates two plots. The first is a faithful recreation of the
 Marki tool, and the second is one I made up. They contain the same information.
+
+The x-axis of this plot is the input frequency, the y-axis is the output
+frequency. It shows how the spurs intersect and overlap the output spectrum.
+
+![Marki Clone](./.readme_screenshots/spur_map.png)
+
+This is essentially what the mixer output would look like on a spectrum
+analyzer.
+
+![Marki Clone](./.readme_screenshots/spectrum.png)

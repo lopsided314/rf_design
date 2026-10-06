@@ -159,6 +159,7 @@ def plot_spurs(
     spur_map_ax.set_ylabel("Output Frequency [GHz]")
     spur_map_ax.grid()
     spur_map_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    spur_map_ax.set_title(f"Spur Map: LO = {LO} GHz")
     spur_map_fig.tight_layout()
 
     spectrum_ax.set_xlim(output_freqs)
@@ -167,12 +168,11 @@ def plot_spurs(
     spectrum_ax.set_ylabel("Spur Level [dBc]")
     spectrum_ax.grid()
     spectrum_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    spectrum_ax.set_title(f"Spur Spectrum: LO = {LO} GHz")
     spectrum_fig.tight_layout()
 
     # Activate hover annotations
-    warnings.filterwarnings(
-        action="ignore", message="Pick support for PolyCollection is missing."
-    )
+    warnings.filterwarnings(action="ignore", module="mplcursors")
     cursor = mplcursors.cursor(spur_map_ax.axes, hover=True)  # type: ignore
     cursor = mplcursors.cursor(spectrum_ax.axes, hover=True)  # type: ignore
 
@@ -188,21 +188,29 @@ def plot_spurs(
 
 
 if __name__ == "__main__":
-    # try:
-    #     if_start = float(input("Input Start: "))
-    #     if_stop = float(input("Input Stop: "))
-    #     rf_start = float(input("Output Start: "))
-    #     rf_stop = float(input("Output Stop: "))
-    #     lo = float(input("LO: "))
-    #     power_diff = float(input("Power delta: "))
-    # except ValueError as e:
-    #     print(f"Invalid input: {e}")
-    #     sys.exit(0)
 
-    if_start = 1
-    if_stop = 1.2
-    rf_start = 6
-    rf_stop = 20
-    lo = 10
-    power_diff = 1
-    plot_spurs((if_start, if_stop), (rf_start, rf_stop), lo, power_diff, -120)
+    def _float_split(prompt: str) -> tuple[float, float]:
+        """fuck shit ass"""
+        first, second = input(prompt).replace(",", " ").replace("/", " ").split()
+
+        return float(first), float(second)
+
+    try:
+        if_start, if_stop = _float_split("Input Start / Stop: ")
+        rf_start, rf_stop = _float_split("Output Start / Stop: ")
+        lo = float(input("LO: "))
+    except (ValueError, IndexError) as e:
+        print(f"Invalid input: {e}")
+        sys.exit(0)
+
+    # Not included in user input because idk I didn't want it there
+    power_diff = 10  # Power difference between LO and IF/RF input
+    min_spur_level_dBc = -120  # Minimum displayed spur level
+
+    plot_spurs(
+        (if_start, if_stop),
+        (rf_start, rf_stop),
+        lo,
+        power_diff,
+        min_spur_level_dBc,
+    )
