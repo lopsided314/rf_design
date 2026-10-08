@@ -2,7 +2,7 @@
 
 The goal of this script is to allow visualization of mixer spurs through
 a double-balanced RF mixer. It was inspired by the online calculator tool
-from Marki Microwave. 
+from Marki Microwave.
 
 Reference: https://markimicrowave.com/technical-resources/tools/spur-calculator/
 
@@ -13,12 +13,12 @@ import sys
 import warnings
 
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 import mplcursors
 import numpy as np
 
-"""Constants taken from the Henderson paper."""
+"""Constants taken from the Henderson paper. Just the ones in the table on
+page 1, not the  actual equation.
+"""
 HENDERSON = np.array(
     [
         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
@@ -127,7 +127,7 @@ def plot_spurs(
     spur_levels.sort(key=lambda x: x[2], reverse=True)
 
     # Make the freq-freq plot
-    spur_map_fig, spur_map_ax = plt.subplots(1, 1, squeeze=True)  # type: ignore
+    spur_web_fig, spur_web_ax = plt.subplots(1, 1, squeeze=True)  # type: ignore
 
     # Make the spectrum output plot
     spectrum_fig, spectrum_ax = plt.subplots(1, 1, squeeze=True)  # type: ignore
@@ -143,7 +143,7 @@ def plot_spurs(
 
         label = f"LO {LO_order} x Input {input_order}: {spur:.0f} dBc"
 
-        spur_map_ax.plot(input_freqs, (mix_start, mix_end), label=label)
+        spur_web_ax.plot(input_freqs, (mix_start, mix_end), label=label)
 
         spectrum_ax.plot((mix_start, mix_end), (spur, spur), label=label)
         spectrum_ax.fill_between(
@@ -153,14 +153,14 @@ def plot_spurs(
             alpha=0.2,
         )
 
-    spur_map_ax.set_xlim(input_freqs)
-    spur_map_ax.set_ylim(output_freqs)
-    spur_map_ax.set_xlabel("Input Frequency [GHz]")
-    spur_map_ax.set_ylabel("Output Frequency [GHz]")
-    spur_map_ax.grid()
-    spur_map_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    spur_map_ax.set_title(f"Spur Map: LO = {LO} GHz")
-    spur_map_fig.tight_layout()
+    spur_web_ax.set_xlim(input_freqs)
+    spur_web_ax.set_ylim(output_freqs)
+    spur_web_ax.set_xlabel("Input Frequency [GHz]")
+    spur_web_ax.set_ylabel("Output Frequency [GHz]")
+    spur_web_ax.grid()
+    spur_web_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    spur_web_ax.set_title(f"Spur Web: LO = {LO} GHz")
+    spur_web_fig.tight_layout()
 
     spectrum_ax.set_xlim(output_freqs)
     spectrum_ax.set_ylim(suppression_cutoff, 5)
@@ -173,7 +173,7 @@ def plot_spurs(
 
     # Activate hover annotations
     warnings.filterwarnings(action="ignore", module="mplcursors")
-    cursor = mplcursors.cursor(spur_map_ax.axes, hover=True)  # type: ignore
+    cursor = mplcursors.cursor(spur_web_ax.axes, hover=True)  # type: ignore
     cursor = mplcursors.cursor(spectrum_ax.axes, hover=True)  # type: ignore
 
     # Customize the annotation text to show our custom labels
