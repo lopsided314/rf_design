@@ -4,7 +4,7 @@ import numpy as np
 # setup the plots
 fig, (time_ax, freq_ax) = plt.subplots(2, 1)
 time_ax.set_title("Time Signal")
-time_ax.set_xlabel("Time Sample #")
+time_ax.set_xlabel("Time [s]")
 
 freq_ax.set_title("FFT Output")
 freq_ax.set_xlabel("FFT Frequency [Hz]")
@@ -16,7 +16,7 @@ freq_ax.set_xlabel("FFT Frequency [Hz]")
 #
 # A few miscellaneous points:
 #
-# 1. Derivation of the e**(1j*x) = cos(x) + 1j*sin(x)
+# - Derivation of the e**(1j*x) = cos(x) + 1j*sin(x)
 #       - exp(x) = 1 + x + x**2/2! + x**3/3! + ...
 #       - cos(x) = 1 - x**2/2! + x**4/4! - x**6/6! + ...
 #       - sin(x) = x - x**3/3! + x**5/5! - x**7/7! + ...
@@ -27,30 +27,39 @@ freq_ax.set_xlabel("FFT Frequency [Hz]")
 #       -            sin(x) = (exp(j*x) - exp(-j*x))/(2*j)
 #       - note that a single-frequency input requires two complex sinusoids,
 #         which is what the fourier transform actually deals with
-# 2. FFT X-axis - See fft_bins function bwlow
-# 3. The 0th bin (a0) is 0 Hz - its just the DC offset of the signal - in other
-#    words, the average value of the signal over the sample window
-# 4. The output is complex
-# 5. It is best practice to make the length of the FFT a power of 2. This is
-#    because much greater computational efficiency can be achieved since the
-#    FFT algorithm implementations can take advantage of this factorization.
-#    It isn't strictly necessary for it to be length 2^n. Many of the examples
-#    in this module don't have a power of 2 length since I think it is easier
-#    to track where the generated result is from by using time constants to
-#    derive the input samples.
-# 6. Not specifically for the FFT, but DFTs in general: If the input signal
-#    has frequency components greater than the Nyquist (1 / (2 * sample period)),
-#    those frequency components will show up as images in the wrong
-#    frequency bins. Look up 'Nyquist Frequency' for more informatino on this.
 #
-#    This does not mean that sampling at exactly 2*Nyquist is a good idea,
-#    in fact its often a bad idea. 4*Nyquist is a better rule of thumb when
-#    choosing a sample rate, although this can be a more complicated subject.
+# - The 0th bin (a0) is 0 Hz - its just the DC offset of the signal - in other
+#   words, the average value of the signal over the sample window
 #
+# - It is best practice to make the length of the FFT a power of 2. This is
+#   because much greater computational efficiency can be achieved since the
+#   FFT algorithm implementations can take advantage of this factorization.
+#   It isn't strictly necessary for it to be length 2^n. Many of the examples
+#   in this module don't have a power of 2 length since I think it is easier
+#   to track where the generated result is from by using time constants to
+#   derive the input samples.
+#
+# - Not specifically for the FFT, but DFTs in general: If the input signal
+#   has frequency components greater than the Nyquist (1 / (2 * sample period)),
+#   those frequency components will show up as images in the wrong
+#   frequency bins. Look up 'Nyquist Frequency' for more informatino on this.
+#
+#   This does not mean that sampling at exactly 2*Nyquist is a good idea,
+#   in fact its often a bad idea.
+#
+# - The amplitude scaling of the output doesn't really mean anything. From
+#   reading google, there are many conventions as to proper scaling, each
+#   with a different justification, but none of them are the 'right' way to
+#   scale the output.
+#    with a different justification, but none of them are the 'right' way to
+#    scale the output.
 
 
 #
 # Convenience function to generate the FFT output bins
+#
+# This does the same thing as np.fft.fftfreq but I wrote it out manually just
+# to prove that I can, I guess.
 #
 def fft_bins(T_sample: float, Nfft: int) -> np.ndarray:
     f = np.zeros(Nfft)
@@ -98,12 +107,15 @@ def manual():
     # 1. all zeros - not a trick question, should see all zeros
     # s = np.array([0, 0, 0, 0])
 
-    # 2. 1 in the first sample - energy in every bin since there is no repetition
+    # 2. all ones - Purely DC offset, shoulw only see 0 Hz bin
+    s = np.array([1, 1, 1, 1])
+
+    # 3. 1 in the first sample - energy in every bin since there is no repetition
     # s = np.array([1, 0, 0, 0])
 
-    # 3. -1 in third sample - should see 0, 2, 0, 2 - energy in the +-1/4 Hz bins (1, 3)
+    # 4. -1 in third sample - should see 0, 2, 0, 2 - energy in the +-1/4 Hz bins (1, 3)
     #    This basically one period of a sinusoid.
-    s = np.array([1, 0, -1, 0])
+    # s = np.array([1, 0, -1, 0])
 
     #
     # input signal length 8, sample period 1 second
@@ -144,7 +156,7 @@ def sine():
 
     # This plot should show 2 peaks - bins have spacing of 1 Hz,
     # so should see equal power in bins 15 and Nfft-15
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
 #
@@ -167,7 +179,7 @@ def half_bin_sine():
     # should see the signal with frequency in the middle of two bins. Notice how
     # tons of energy leaking into many surrounding bins, not just the 2
     # on either side of the 'true' frequency
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
 #
@@ -196,7 +208,7 @@ def zero_pad():
     # many more fft output samples that make the plot smoother. However, there
     # is not actually more information here - notice how the peaks at the
     # input signal base frequencies are not as sharp.
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
 #
@@ -214,11 +226,11 @@ def complex_sine():
     t = np.arange(t_start, t_stop, T_sample)
 
     # generate a complex sine wave
-    s = np.exp(1j * 2 * np.pi * 15.5 * t)
+    s = np.exp(1j * 2 * np.pi * 15 * t)
 
     # Should see the same thing as the real signal except the negative image
     # is gone
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
 #
@@ -243,7 +255,7 @@ def pulsed_carrier():
     s[(3 <= t) & (t < 4)] = 0
 
     # Should see 2 sinc functions, centered at +-20 Hz
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
 #
@@ -268,7 +280,7 @@ def pulsed_carrier_oversampled():
     s[(3 <= t) & (t < 4)] = 0
 
     # Should see 2 sinc functions at +- 20 Hz, but with higher definition
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
 #
@@ -290,7 +302,7 @@ def LFM():
     s = np.exp(1j * 2 * np.pi * (20 * t + lfm_slope / 2 * t**2))
 
     # should see power between 20 and 70 Hz
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
 #
@@ -316,7 +328,7 @@ def pulsed_LFM():
     s[(3 <= t) & (t < 4)] = 0
 
     # should see power between 20 and 70 Hz
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
 #
@@ -341,23 +353,26 @@ def noise():
     # constant power. It is called 'white' noise since it has constant power
     # over all frequencies, similiar to how white light is a combination of all
     # other component wavelengths.
-    return fft_bins(T_sample, s.size), s
+    return t, s
 
 
-f, s = noise()
+t, s = manual()
 
 # take the fft
+f = fft_bins(T_sample=(t[1] - t[0]), Nfft=t.size)
 S = np.fft.fft(s)
 
+print(S)
 # update the plots
 #
 # Since the output of the FFT is complex, take the absolute value to plot
 # the total energy in each bin
-time_ax.stem(s)
+time_ax.stem(t, s)
 freq_ax.stem(f, np.abs(S))
 
 # open the plot windows
 plt.tight_layout()
+
 try:
     plt.show()
 except KeyboardInterrupt:
