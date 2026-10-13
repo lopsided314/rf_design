@@ -1,6 +1,7 @@
 """Base imports for signal chain library."""
 
 from signal_chain import noise_figure
+from signal_chain import third_order_intercept
 from signal_chain import sgc_analyzer as analysis
 
 from signal_chain.rf_component import RFComponent, Amp, Mixer, Loss

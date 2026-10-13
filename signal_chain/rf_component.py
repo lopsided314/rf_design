@@ -46,6 +46,7 @@ class RFComponent(NoiseFigureStage):
         gain_dB: float,
         NF_dB: float,
         Pin_warn_dBm: float,
+        OIP3_dBm: float,
         desc: str,
     ) -> None:
         """Create an RF Component model with common RF component parameters.
@@ -54,11 +55,13 @@ class RFComponent(NoiseFigureStage):
             gain_dB (float): Power gain, in dB.
             NF_dB (float): Noise Figure, in dB.
             Pin_warn_dBm (float): Input power limit, in dBm.
+            OIP3_dBm (float): Output power at third order intercept, in dBm.
             desc (str): Description of component.
         """
         super().__init__(
             G=sgc_math.undB(gain_dB),
             F=sgc_math.undB(NF_dB),
+            OIP3=sgc_math.undBm(OIP3_dBm),
         )
 
         self.rf_in: RFSignal = RFSignal()
@@ -108,6 +111,7 @@ def Amp(
     gain_dB: float,
     NF_dB: float,
     OP1dB_dBm: float = 999,
+    OIP3_dBm: float = 999,
     desc: str = "_Amp",
 ) -> RFComponent:
     """Construct a component representing typical amplifier parameters.
@@ -117,6 +121,8 @@ def Amp(
         NF_dB (float): amplifier noise figure, in dB
         OP1dB_dBm (float, optional): Output power at 1 dB compression point.
             Defaults to 999 (never goes into compression).
+        OIP3_dBm (float, optional): Output power at third order intercept point.
+            Defaults to 999 (no third order products).
         desc (str, optional): brief description of component. Defaults to "_Amp".
 
     Returns:
@@ -126,6 +132,7 @@ def Amp(
         gain_dB=gain_dB,
         NF_dB=NF_dB,
         Pin_warn_dBm=OP1dB_dBm - gain_dB,
+        OIP3_dBm=OIP3_dBm,
         desc=desc,
     )
 
@@ -134,6 +141,7 @@ def Mixer(
     loss_dB: float,
     NF_dB: float,
     IP1dB_dBm: float = 999,
+    IIP3_dBm: float = 999,
     desc: str = "_Mixer",
 ) -> RFComponent:
     """Construct a component representing typical mixer parameters.
@@ -143,6 +151,8 @@ def Mixer(
         NF_dB (float): mixer noise figure, in dB
         IP1dB_dBm (float, optional): Input power at 1 dB compression point.
             Defaults to 999 dBm (never goes into compression).
+        IIP3_dBm (float, optional): Input power at third order intercept point.
+            Defaults to 999 (no third order products).
         desc (str, optional): brief description of component. Defaults to "_Mixer".
 
     Returns:
@@ -152,6 +162,7 @@ def Mixer(
         gain_dB=-loss_dB,
         NF_dB=NF_dB,
         Pin_warn_dBm=IP1dB_dBm,
+        OIP3_dBm=IIP3_dBm - loss_dB,
         desc=desc,
     )
 
@@ -159,6 +170,7 @@ def Mixer(
 def Loss(
     loss_dB: float,
     Pin_warn_dBm: float = 999,
+    IIP3_dBm: float = 999,
     desc: str = "_Loss",
 ) -> RFComponent:
     """Construct a component representing generic loss parameters.
@@ -170,6 +182,8 @@ def Loss(
         loss_dB (float): component power loss, in dB
         Pin_warn_dBm (float, optional): Input power at which the analyzer will give a warning.
             Defaults to 999 (no power limit)
+        IIP3_dBm (float, optional): Input power at third order intercept point.
+            Defaults to 999 (no third order products).
         desc (str, optional): brief description of component. Defaults to "_Loss".
 
     Returns:
@@ -179,5 +193,6 @@ def Loss(
         gain_dB=-loss_dB,
         NF_dB=loss_dB,
         Pin_warn_dBm=Pin_warn_dBm,
+        OIP3_dBm=IIP3_dBm - loss_dB,
         desc=desc,
     )

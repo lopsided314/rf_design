@@ -43,6 +43,7 @@ class RFChain(noise_figure.NoiseFigureStage):
         G (float): Total Gain of sequence
         F (float): Total Noise Factor of sequence
         G_cas (list[float]): Cumulative Gain of components
+        OIP3_cas (list[float]): Cumulative Third Order Intercept of components
         F_cas (list[float]): Cumulative Noise Factor of components
         rf_in (RFSignal): Input RF Signal
         rf_out (RFSignal): Output RF Signal
@@ -66,8 +67,10 @@ class RFChain(noise_figure.NoiseFigureStage):
         self.components: list[RFComponent] = list(copy.deepcopy(components))
         self.desc: str = desc
 
-        self.G_cas, self.F_cas = noise_figure.cascade_G_F(self.components)
-        super().__init__(self.G_cas[-1], self.F_cas[-1])
+        self.G_cas, self.F_cas, self.OIP3_cas = noise_figure.cascade_G_F(
+            self.components
+        )
+        super().__init__(self.G_cas[-1], self.F_cas[-1], self.OIP3_cas[-1])
 
         self.rf_in: RFSignal = RFSignal()
         self.rf_out: RFSignal = RFSignal()
@@ -109,6 +112,7 @@ class RFChain(noise_figure.NoiseFigureStage):
             f"'{self.desc}' totals:\n"
             f"  G     = {sgc_str.sdB(self.G)} dB\n"
             f"  NF    = {sgc_str.sdB(self.F)} dB\n"
+            f"  OIP3  = {sgc_str.sdBm(self.OIP3)} dBm\n"
             f"  Si    = {sgc_str.sdBm(rf_in.S)} dBm\n"
             f"  So    = {sgc_str.sdBm(rf_out.S)} dBm\n"
             f"  Ni    = {sgc_str.sdBm(rf_in.N)} dBm/Hz\n"
@@ -162,6 +166,7 @@ class Coax(RFChain):
                     gain_dB=-self.loss_per_dB * length,
                     NF_dB=self.loss_per_dB * length,
                     Pin_warn_dBm=999,
+                    OIP3_dBm=999,
                     desc="coax",
                 )
             ],
@@ -206,6 +211,7 @@ class KnownChain(RFChain):
                     gain_dB=gain_dB,
                     NF_dB=NF_dB,
                     Pin_warn_dBm=999,
+                    OIP3_dBm=999,
                     desc="All",
                 ),
             ),

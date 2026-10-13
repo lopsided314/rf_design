@@ -2,7 +2,7 @@
 
 Tools to make cascaded noise figure computation simpler.
 
-Typical usage example:
+Typical usage example: # TODO: Update
     stages = [
         NoiseFigureStage(10, 2),
         NoiseFigureStage(0.2, 2),
@@ -27,10 +27,12 @@ class NoiseFigureStage:
     Attributes:
         G (float): power gain of represented object (not dB)
         F (float): noise factor of represented object (not dB)
+        OIP3 (float): third-order-intercept power (Watts)
     """
 
     G: float
     F: float
+    OIP3: float
 
     def __post_init__(self) -> None:
         """Verify parameters are valid.
@@ -40,14 +42,21 @@ class NoiseFigureStage:
         Args:
             G (float): power gain (not dB).
             F (float): noise factor (not dB).
+            OIP3 (float): third-order-intercept power (Watts)
+
+        Raises:
+            ValueError: One or more stages have invalid gain or noise factor parameters.
         """
 
-        if self.G < 0 or self.F < 1:
+        if self.G < 0 or self.F < 1 or self.OIP3 < 0:
             raise ValueError("Stage has invalid parameters")
 
 
-def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[list[float], list[float]]:
-    """Compute the cascaded Gain and Noise Factor of ordered stages.
+def cascade_G_F(
+    stages: Sequence[NoiseFigureStage],
+) -> tuple[list[float], list[float], list[float]]:
+    """Compute the cascaded Gain, Noise Factor, and Output Third Order
+    Intercept of ordered stages.
 
     https://en.wikipedia.org/wiki/Noise_figure#Noise_factor_of_cascaded_devices
 
@@ -56,33 +65,37 @@ def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[list[float], list[f
 
     Raises:
         ValueError: No stages were provided.
-        ValueError: One or more stages have invalid gain or noise factor parameters.
 
     Returns:
         A tuple of 2 lists, the cascaded gain G and the cascaded noise factor F.
         G = [G1,
-              G1*G2,
-              G1*G2*G3,
-              ...
-              G1*G2*...*Gn],
+             G1*G2,
+             G1*G2*G3,
+             ...
+             G1*G2*...*Gn],
         F = [F1,
              F1 + (F2 - 1)/G1,
              F1 + (F2 - 1)/G1 + (F3 - 1)/(G1*G2),
              ...
              F1 + (F2 - 1)/G1 + (F3 - 1)/(G1*G2) + ... + (Fn - 1)/(G1*G2*...*Gn-1)]
+        OIP3 = [1 / ( 1 / OIP3_1),
+                1 / ( 1 / (OIP3_1 * G2) + 1 / OIP3_2),
+                1 / ( 1 / (OIP3_1 * G2 * G3) + 1 / (OIP3_2 * G4) + 1 / OIP3_3),
+                ...
+            ]
     """
 
     if len(stages) == 0:
         raise ValueError("Calculations require one or more stages")
 
     Gees: list[float] = [s.G for s in stages]
-    Effs: list[float] = [s.F for s in stages]
 
     G_accum: list[float] = [math.prod(Gees[: i + 1]) for i in range(len(Gees))]
+    F_accum: list[float] = [stages[0].F]
+    OIP3_accum: list[float] = [stages[0].OIP3]
 
-    F_accum: list[float] = [Effs[0]]
+    for g, s in zip(G_accum[:-1], stages[1:]):
+        F_accum.append(F_accum[-1] + (s.F - 1) / g)
+        OIP3_accum.append(1 / (1 / (OIP3_accum[-1] * s.G) + 1 / s.OIP3))
 
-    for g, f in zip(G_accum[:-1], Effs[1:]):
-        F_accum.append(F_accum[-1] + (f - 1) / g)
-
-    return G_accum, F_accum
+    return G_accum, F_accum, OIP3_accum
