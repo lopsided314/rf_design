@@ -84,6 +84,7 @@ def _generate_inlined_text(
         "SNRi": [],
         "SNRo": [],
         "SNR loss": [],
+        "SFDR": [],
         "Warning": [],
     }
 
@@ -115,6 +116,8 @@ def _generate_inlined_text(
 
         if isinstance(section, RFComponent):
             stage_params["Warning"].append(("WARN" if section.warning else ""))
+        elif isinstance(section, RFChain):
+            stage_params["SFDR"].append(sgc_str.sdB(section.SFDR))
 
         accum_params["G tot"].append(sgc_str.sdB(G))
         accum_params["NF tot"].append(sgc_str.sdB(F))

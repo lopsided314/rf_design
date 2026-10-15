@@ -97,6 +97,9 @@ class RFChain(noise_figure.NoiseFigureStage):
         self.rf_in = rf_in
         self.rf_out = rf_out
 
+        # Find the Spurious Free Dynamic Range
+        self.SFDR = (self.OIP3 / (self.rf_out.N * self.rf_out.BW)) ** (2 / 3)
+
         return rf_out
 
     def status(self) -> str:
@@ -109,31 +112,32 @@ class RFChain(noise_figure.NoiseFigureStage):
             str: Printable format of the component chain properties.
         """
 
-        # Find the Spurious Free Dynamic Range
-        SFDR = (self.OIP3 / (self.rf_out.N * self.rf_out.BW)) ** (2 / 3)
-
-        # Find the maximum output power
-        S_clip: float = sgc_math.default_dBm()
+        # Find the maximum output / input power
+        S_clipped: float = 1 / sgc_math.default_dBm()
         for component in self.components:
-            S_clip = min(S_clip, component._Si_warn) * component.G
+            S_clipped = min(S_clipped, component._Si_warn) * component.G
 
-        # Make the printout a little cleaner if there isn't an actual limit
-        if S_clip > 1e9:
-            S_clip = sgc_math.default_dBm()
+        if S_clipped > 1e9:
+            # Make the printout a little cleaner if there isn't an actual limit
+            S_clipped = 1 / sgc_math.default_dBm()
+            Pin_lim = S_clipped
+        else:
+            Pin_lim = S_clipped / self.G
 
         return (
             f"'{self.desc}' totals:\n"
             f"  G     = {sgc_str.sdB(self.G)} dB\n"
             f"  NF    = {sgc_str.sdB(self.F)} dB\n"
+            f"  IP1dB = {sgc_str.sdBm(Pin_lim)} dBm\n"
+            f"  OP1dB = {sgc_str.sdBm(S_clipped)} dBm\n"
             f"  OIP3  = {sgc_str.sdBm(self.OIP3)} dBm\n"
-            f"  OP1dB = {sgc_str.sdBm(S_clip)} dBm\n"
             f"  Si    = {sgc_str.sdBm(self.rf_in.S)} dBm\n"
             f"  So    = {sgc_str.sdBm(self.rf_out.S)} dBm\n"
             f"  Ni    = {sgc_str.sdBm(self.rf_in.N)} dBm/Hz\n"
             f"  No    = {sgc_str.sdBm(self.rf_out.N)} dBm/Hz\n"
             f"  SNRi  = {sgc_str.sdB(self.rf_in.SNR)} dB\n"
             f"  SNRo  = {sgc_str.sdB(self.rf_out.SNR)} dB\n"
-            f"  SFDR  = {sgc_str.sdB(SFDR)} dB\n"
+            f"  SFDR  = {sgc_str.sdB(self.SFDR)} dB\n"
             f"{'\n'.join(f'  Warning: {c.warning}' for c in self.components if c.warning)}\n"
         )
 

@@ -18,7 +18,7 @@ def example() -> None:
     components: list[rf_comp.RFComponent] = [
         rf_comp.Amp(10, 2, OP1dB_dBm=0, OIP3_dBm=10, desc="lna"),
         rf_comp.Loss(1, desc="bpf"),
-        rf_comp.Mixer(3, 4, desc="mixer"),
+        rf_comp.Mixer(3, 4, IP1dB_dBm=-3, desc="mixer"),
     ]
 
     # make a list of one or more sections
