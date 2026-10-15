@@ -17,7 +17,9 @@ import mplcursors
 import numpy as np
 
 """Constants taken from the Henderson paper. Just the ones in the table on
-page 1, not the  actual equation.
+page 1, not the general equation.
+
+Arrays are indexed [n_LO, m_RF].
 """
 HENDERSON = np.array(
     [
@@ -40,8 +42,7 @@ M = +13 dBm
 N = +16 dBm
 H = +19 dBm
 
-Arrays are indexed [LO_order, IF_order].
-
+Arrays are indexed [n_LO, m_RF].
 """
 
 MARKI_TABLES: dict[str, np.ndarray] = {
@@ -88,20 +89,16 @@ MARKI_TABLES: dict[str, np.ndarray] = {
 }
 
 
-def henderson_table(n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float) -> float:
+def henderson_table(n_LO: int, m_RF: int, P_delta: float) -> float:
     """Compute Mixer Spur suppression, based on table in Henderson Model paper."""
 
-    dP: float = P_RF_dBm - P_LO_dBm
-
-    return HENDERSON[abs(n_LO), abs(m_RF)] + dP * abs(m_RF - 1)
+    return HENDERSON[abs(n_LO), abs(m_RF)] + P_delta * abs(abs(m_RF) - 1)
 
 
-def marki_calc(n_LO: int, m_RF: int, P_RF_dBm: float, P_LO_dBm: float) -> float:
+def marki_calc(n_LO: int, m_RF: int, P_delta: float) -> float:
     """Compute Mixer Spur suppression, based on Marki calculator tool."""
 
-    dP: float = P_RF_dBm - P_LO_dBm
-
-    return MARKI_TABLES["H"][abs(n_LO), abs(m_RF)] + dP * abs(m_RF - 1)
+    return MARKI_TABLES["H"][abs(n_LO), abs(m_RF)] + P_delta * abs(abs(m_RF) - 1)
 
 
 def plot_spurs(
@@ -111,47 +108,80 @@ def plot_spurs(
     Pdiff: float,
     suppression_cutoff: float,
 ):
-    order_multiples = (0,) + tuple(val for x in range(1, 6) for val in (x, -x))
+    """Generate plots to visualize mixer spurs.
+
+    Args:
+        input_freqs (tuple[float, float]): Input frequency range
+        output_freqs (tuple[float, float]): Output frequency range
+        LO (float): LO frequency
+        Pdiff (float): Power difference between LO and RF signals (P_RF - P_LO)
+        suppression_cutoff (float): Mimimum spur level to show on plots
+    """
+
+    order_multiples = (0,) + tuple(val for x in range(1, 8) for val in (x, -x))
 
     spur_levels: list[tuple[int, int, float]] = []
 
     # compute the spur suppression levels
-    for lo, inp in itertools.combinations_with_replacement(order_multiples, 2):
-        # for now, hard coded for 'H' Marki tables
-        spur = marki_calc(abs(lo), abs(inp), 19 - Pdiff, 19)
-        if np.isnan(spur) or spur < suppression_cutoff:
+    for n_LO, m_RF in itertools.product(order_multiples, repeat=2):
+
+        spur = marki_calc(abs(n_LO), abs(m_RF), Pdiff)
+        if np.isnan(spur) or spur < suppression_cutoff or (n_LO == m_RF == 0):
             continue
 
-        spur_levels.append((lo, inp, spur))
+        spur_levels.append((n_LO, m_RF, spur))
 
     spur_levels.sort(key=lambda x: x[2], reverse=True)
 
     # Make the freq-freq plot
-    spur_web_fig, spur_web_ax = plt.subplots(1, 1, squeeze=True)  # type: ignore
+    spur_web_fig, spur_web_ax = plt.subplots(1, 1, squeeze=True)
 
     # Make the spectrum output plot
-    spectrum_fig, spectrum_ax = plt.subplots(1, 1, squeeze=True)  # type: ignore
+    spectrum_fig, spectrum_ax = plt.subplots(1, 1, squeeze=True)
 
-    for LO_order, input_order, spur in spur_levels:
-        mix_start = LO * LO_order + input_order * input_freqs[0]
-        mix_end = LO * LO_order + input_order * input_freqs[1]
+    for n_LO, m_RF, spur in spur_levels:
+        mix_start = LO * n_LO + m_RF * input_freqs[0]
+        mix_end = LO * n_LO + m_RF * input_freqs[1]
 
         if (mix_start < output_freqs[0] and mix_end < output_freqs[0]) or (
             mix_start > output_freqs[1] and mix_end > output_freqs[1]
         ):
             continue
 
-        label = f"LO {LO_order} x Input {input_order}: {spur:.0f} dBc"
+        label = f"LO {n_LO} x Input {m_RF}: {spur:.0f} dBc"
 
         spur_web_ax.plot(input_freqs, (mix_start, mix_end), label=label)
 
-        spectrum_ax.plot((mix_start, mix_end), (spur, spur), label=label)
-        spectrum_ax.fill_between(
-            (mix_start, mix_end),
-            suppression_cutoff,
-            y2=spur,  # type: ignore
-            alpha=0.2,
-        )
+        # If it is one of the LO multiples, make it a nice little arrow instead
+        # of the highlighted span
+        if m_RF == 0:
+            spectrum_ax.plot(
+                (mix_start, mix_end),
+                (suppression_cutoff, spur),
+                label=label,
+            )
+            spectrum_ax.plot(
+                mix_end,
+                spur,
+                marker="^",
+                markeredgecolor=spectrum_ax.lines[-1].get_color(),
+                markerfacecolor=spectrum_ax.lines[-1].get_color(),
+                markersize=6,
+            )
+        else:
+            spectrum_ax.plot(
+                (mix_start, mix_end),
+                (spur, spur),
+                label=label,
+            )
+            spectrum_ax.fill_between(
+                (mix_start, mix_end),
+                suppression_cutoff,
+                y2=spur,
+                alpha=0.2,
+            )
+
+    input_desc = f"LO = {LO} GHz, $\\Delta$P = {Pdiff} dB"
 
     spur_web_ax.set_xlim(input_freqs)
     spur_web_ax.set_ylim(output_freqs)
@@ -159,7 +189,7 @@ def plot_spurs(
     spur_web_ax.set_ylabel("Output Frequency [GHz]")
     spur_web_ax.grid()
     spur_web_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    spur_web_ax.set_title(f"Spur Web: LO = {LO} GHz")
+    spur_web_ax.set_title(f"Spur Web: {input_desc}")
     spur_web_fig.tight_layout()
 
     spectrum_ax.set_xlim(output_freqs)
@@ -168,17 +198,26 @@ def plot_spurs(
     spectrum_ax.set_ylabel("Spur Level [dBc]")
     spectrum_ax.grid()
     spectrum_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    spectrum_ax.set_title(f"Spur Spectrum: LO = {LO} GHz")
+    spectrum_ax.set_title(f"Spur Spectrum: {input_desc}")
     spectrum_fig.tight_layout()
 
     # Activate hover annotations
+    #
+    # Silence warnings from the cursor lib about polyfill
     warnings.filterwarnings(action="ignore", module="mplcursors")
-    cursor = mplcursors.cursor(spur_web_ax.axes, hover=True)  # type: ignore
-    cursor = mplcursors.cursor(spectrum_ax.axes, hover=True)  # type: ignore
+
+    web_cursor = mplcursors.cursor(spur_web_ax.axes, hover=True)
+    spectrum_cursor = mplcursors.cursor(spectrum_ax.axes, hover=True)
 
     # Customize the annotation text to show our custom labels
-    @cursor.connect("add")
-    def on_add(sel):
+    #
+    # LLM Slop, don't know how this works
+    @web_cursor.connect("add")
+    def on_add_web(sel):
+        sel.annotation.set_text(sel.annotation.get_text().split("\n")[0])
+
+    @spectrum_cursor.connect("add")
+    def on_add_spectum(sel):
         sel.annotation.set_text(sel.annotation.get_text().split("\n")[0])
 
     try:
@@ -195,17 +234,22 @@ if __name__ == "__main__":
 
         return float(first), float(second)
 
-    try:
-        if_start, if_stop = _float_split("Input Start / Stop: ")
-        rf_start, rf_stop = _float_split("Output Start / Stop: ")
-        lo = float(input("LO: "))
-    except (ValueError, IndexError) as e:
-        print(f"Invalid input: {e}")
-        sys.exit(0)
+    if False:
+        try:
+            if_start, if_stop = _float_split("Input Start / Stop: ")
+            rf_start, rf_stop = _float_split("Output Start / Stop: ")
+            lo = float(input("LO: "))
+        except (ValueError, IndexError) as e:
+            print(f"Invalid input: {e}")
+            sys.exit(0)
+    else:
+        if_start, if_stop = 5.5, 6.5
+        rf_start, rf_stop = 0, 17
+        lo = 8.3
 
     # Not included in user input because idk I didn't want it there
-    power_diff = 10  # Power difference between LO and IF/RF input
-    min_spur_level_dBc = -120  # Minimum displayed spur level
+    power_diff = -20  # Power difference between LO and IF/RF input
+    min_spur_level_dBc = -80  # Minimum displayed spur level
 
     plot_spurs(
         (if_start, if_stop),
