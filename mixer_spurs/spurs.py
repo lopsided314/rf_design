@@ -10,80 +10,80 @@ Reference: https://markimicrowave.com/technical-resources/tools/spur-calculator/
 
 import itertools
 import sys
-import warnings
 
 import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np
 
-"""Constants taken from the Henderson paper. Just the ones in the table on
-page 1, not the general equation.
-
-Arrays are indexed [n_LO, m_RF].
-"""
+#
+# Constants taken from the Henderson paper. Just the ones in the table on
+# page 1, not the general equation.
+#
+# Arrays are indexed [n_LO, m_RF].
+#
 HENDERSON = np.array(
     [
-        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-        [np.nan, 0, -41, -28, np.nan, np.nan],
-        [np.nan, -35, -39, -44, np.nan, np.nan],
-        [np.nan, -10, -32, -18, np.nan, np.nan],
-        [np.nan, -35, -39, np.nan, np.nan, np.nan],
-        [np.nan, -14, np.nan, -14, np.nan, np.nan],
+        [0, np.nan, np.nan, np.nan, np.nan, np.nan],
+        [0, 0, -41, -28, np.nan, np.nan],
+        [0, -35, -39, -44, np.nan, np.nan],
+        [0, -10, -32, -18, np.nan, np.nan],
+        [0, -35, -39, np.nan, np.nan, np.nan],
+        [0, -14, np.nan, -14, np.nan, np.nan],
     ]
 )
 
-"""Constants taken from the Marki Microwave online spur calculator.
-
-'L', 'M', 'N', and 'H' represent LO drive levels, specific to their own product
-line - they make a MM1-0320LS and a MM1-0320HS
-
-L = +10 dBm
-M = +13 dBm
-N = +16 dBm
-H = +19 dBm
-
-Arrays are indexed [n_LO, m_RF].
-"""
-
+#
+# Constants taken from the Marki Microwave online spur calculator.
+#
+# 'L', 'M', 'N', and 'H' represent LO drive levels, specific to their own product
+# line - they make a MM1-0320LS and a MM1-0320HS
+#
+# L = +10 dBm
+# M = +13 dBm
+# N = +16 dBm
+# H = +19 dBm
+#
+# Arrays are indexed [n_LO, m_RF].
+#
 MARKI_TABLES: dict[str, np.ndarray] = {
     "L": np.array(
         [
-            [-8.0, -26.0, -39.0, -45.0, -68.0, -59.0],
-            [-8.0, 0.0, -33.0, -28.0, -51.0, -57.0],
-            [-8.0, -26.0, -39.0, -35.0, -58.0, -55.0],
-            [-8.0, -10.0, -23.0, -18.0, -37.0, -43.0],
-            [np.nan, -26.0, -39.0, -21.0, -44.0, -38.0],
-            [np.nan, -14.0, -19.0, -14.0, -20.0, -26.0],
+            [0, -26.0, -39.0, -45.0, -68.0, -59.0],
+            [0, 0.0, -33.0, -28.0, -51.0, -57.0],
+            [0, -26.0, -39.0, -35.0, -58.0, -55.0],
+            [0, -10.0, -23.0, -18.0, -37.0, -43.0],
+            [0, -26.0, -39.0, -21.0, -44.0, -38.0],
+            [0, -14.0, -19.0, -14.0, -20.0, -26.0],
         ]
     ),
     "M": np.array(
         [
-            [-5.0, -26.0, -39.0, -44.0, -68.0, -59.0],
-            [-5.0, 0.0, -32.0, -28.0, -50.0, -57.0],
-            [-5.0, -26.0, -39.0, -35.0, -58.0, -54.0],
-            [-5.0, -10.0, -23.0, -18.0, -36.0, -43.0],
-            [-5.0, -26.0, -39.0, -21.0, -44.0, -37.0],
-            [-5.0, -14.0, -18.0, -14.0, -19.0, -26.0],
+            [0, -26.0, -39.0, -44.0, -68.0, -59.0],
+            [0, 0.0, -32.0, -28.0, -50.0, -57.0],
+            [0, -26.0, -39.0, -35.0, -58.0, -54.0],
+            [0, -10.0, -23.0, -18.0, -36.0, -43.0],
+            [0, -26.0, -39.0, -21.0, -44.0, -37.0],
+            [0, -14.0, -18.0, -14.0, -19.0, -26.0],
         ]
     ),
     "N": np.array(
         [
-            [-2.0, -27.0, -39.0, -46.0, -68.0, -60.0],
-            [-2.0, 0.0, -34.0, -28.0, -52.0, -57.0],
-            [-2.0, -27.0, -39.0, -36.0, -58.0, -56.0],
-            [-2.0, -10.0, -24.0, -18.0, -38.0, -43.0],
-            [-2.0, -27.0, -39.0, -22.0, -44.0, -39.0],
-            [-2.0, -14.0, -20.0, -14.0, -21.0, -26.0],
+            [0, -27.0, -39.0, -46.0, -68.0, -60.0],
+            [0, 0.0, -34.0, -28.0, -52.0, -57.0],
+            [0, -27.0, -39.0, -36.0, -58.0, -56.0],
+            [0, -10.0, -24.0, -18.0, -38.0, -43.0],
+            [0, -27.0, -39.0, -22.0, -44.0, -39.0],
+            [0, -14.0, -20.0, -14.0, -21.0, -26.0],
         ]
     ),
     "H": np.array(
         [
-            [0.0, -26.0, -39.0, -44.0, -68.0, -58.0],
-            [0.0, 0.0, -32.0, -28.0, -50.0, -57.0],
-            [0.0, -26.0, -39.0, -34.0, -58.0, -54.0],
-            [0.0, -10.0, -22.0, -18.0, -36.0, -43.0],
-            [0.0, -26.0, -39.0, -20.0, -44.0, -37.0],
-            [0.0, -14.0, -18.0, -14.0, -19.0, -26.0],
+            [0, -26.0, -39.0, -44.0, -68.0, -58.0],
+            [0, 0.0, -32.0, -28.0, -50.0, -57.0],
+            [0, -26.0, -39.0, -34.0, -58.0, -54.0],
+            [0, -10.0, -22.0, -18.0, -36.0, -43.0],
+            [0, -26.0, -39.0, -20.0, -44.0, -37.0],
+            [0, -14.0, -18.0, -14.0, -19.0, -26.0],
         ]
     ),
 }
@@ -92,13 +92,19 @@ MARKI_TABLES: dict[str, np.ndarray] = {
 def henderson_table(n_LO: int, m_RF: int, P_delta: float) -> float:
     """Compute Mixer Spur suppression, based on table in Henderson Model paper."""
 
-    return HENDERSON[abs(n_LO), abs(m_RF)] + P_delta * abs(abs(m_RF) - 1)
+    try:
+        return HENDERSON[abs(n_LO), abs(m_RF)] + P_delta * (abs(m_RF) - 1)
+    except IndexError:
+        return np.nan
 
 
 def marki_calc(n_LO: int, m_RF: int, P_delta: float) -> float:
     """Compute Mixer Spur suppression, based on Marki calculator tool."""
 
-    return MARKI_TABLES["H"][abs(n_LO), abs(m_RF)] + P_delta * abs(abs(m_RF) - 1)
+    try:
+        return MARKI_TABLES["H"][abs(n_LO), abs(m_RF)] + P_delta * (abs(m_RF) - 1)
+    except IndexError:
+        return np.nan
 
 
 def plot_spurs(
@@ -106,6 +112,7 @@ def plot_spurs(
     output_freqs: tuple[float, float],
     LO: float,
     Pdiff: float,
+    LO_suppression: float,
     suppression_cutoff: float,
 ):
     """Generate plots to visualize mixer spurs.
@@ -115,18 +122,17 @@ def plot_spurs(
         output_freqs (tuple[float, float]): Output frequency range
         LO (float): LO frequency
         Pdiff (float): Power difference between LO and RF signals (P_RF - P_LO)
+        LO_isolation (float): Isolation from L to R port
         suppression_cutoff (float): Mimimum spur level to show on plots
     """
-
-    order_multiples = (0,) + tuple(val for x in range(1, 6) for val in (x, -x))
 
     spur_levels: list[tuple[int, int, float]] = []
 
     # compute the spur suppression levels
-    for n_LO, m_RF in itertools.product(order_multiples, repeat=2):
+    for n_LO, m_RF in itertools.product(range(-5, 6), repeat=2):
 
         spur = marki_calc(abs(n_LO), abs(m_RF), Pdiff)
-        if np.isnan(spur) or spur < suppression_cutoff or (n_LO == m_RF == 0):
+        if np.isnan(spur) or spur < suppression_cutoff or n_LO == m_RF == 0:
             continue
 
         spur_levels.append((n_LO, m_RF, spur))
@@ -136,49 +142,54 @@ def plot_spurs(
     # Make the freq-freq plot
     spur_web_fig, spur_web_ax = plt.subplots(1, 1, squeeze=True)
 
-    # Make the spectrum output plot
+    # Make the spectrum plot
     spectrum_fig, spectrum_ax = plt.subplots(1, 1, squeeze=True)
 
+    # add all the spurs to the plots
     for n_LO, m_RF, spur in spur_levels:
-        mix_start = LO * n_LO + m_RF * input_freqs[0]
-        mix_end = LO * n_LO + m_RF * input_freqs[1]
+        mixed_start = LO * n_LO + m_RF * input_freqs[0]
+        mixed_end = LO * n_LO + m_RF * input_freqs[1]
 
-        if (mix_start < output_freqs[0] and mix_end < output_freqs[0]) or (
-            mix_start > output_freqs[1] and mix_end > output_freqs[1]
+        if (mixed_start < output_freqs[0] and mixed_end < output_freqs[0]) or (
+            mixed_start > output_freqs[1] and mixed_end > output_freqs[1]
         ):
             continue
-
-        label = f"LO {n_LO} x Input {m_RF}: {spur:.0f} dBc"
-
-        spur_web_ax.plot(input_freqs, (mix_start, mix_end), label=label)
 
         # If it is one of the LO multiples, make it a nice little arrow instead
         # of the highlighted span
         if m_RF == 0:
+            label = f"LO {n_LO} x Input {m_RF}: {LO_suppression:.0f} dBc"
+
+            spur_web_ax.plot(input_freqs, (mixed_start, mixed_end), label=label)
+
             spectrum_ax.plot(
-                (mix_start, mix_end),
-                (suppression_cutoff, spur),
+                (mixed_start, mixed_end),
+                (suppression_cutoff, LO_suppression),
                 label=label,
             )
             spectrum_ax.plot(
-                mix_end,
-                spur,
+                mixed_end,
+                LO_suppression,
                 marker="^",
                 markeredgecolor=spectrum_ax.lines[-1].get_color(),
                 markerfacecolor=spectrum_ax.lines[-1].get_color(),
-                markersize=6,
             )
         else:
+            label = f"LO {n_LO} x Input {m_RF}: {spur:.0f} dBc"
+
+            spur_web_ax.plot(input_freqs, (mixed_start, mixed_end), label=label)
+
             spectrum_ax.plot(
-                (mix_start, mix_end),
+                (mixed_start, mixed_end),
                 (spur, spur),
                 label=label,
             )
             spectrum_ax.fill_between(
-                (mix_start, mix_end),
+                (mixed_start, mixed_end),
                 suppression_cutoff,
                 y2=spur,
                 alpha=0.2,
+                color=spectrum_ax.lines[-1].get_color(),
             )
 
     input_desc = f"LO = {LO} GHz, $\\Delta$P = {Pdiff} dB"
@@ -202,23 +213,19 @@ def plot_spurs(
     spectrum_fig.tight_layout()
 
     # Activate hover annotations
-    #
-    # Silence warnings from the cursor lib about polyfill
-    warnings.filterwarnings(action="ignore", module="mplcursors")
-
-    web_cursor = mplcursors.cursor(spur_web_ax.axes, hover=True)
-    spectrum_cursor = mplcursors.cursor(spectrum_ax.axes, hover=True)
+    web_cursor = mplcursors.cursor(spur_web_ax.lines, hover=True)
+    spectrum_cursor = mplcursors.cursor(spectrum_ax.lines, hover=True)
 
     # Customize the annotation text to show our custom labels
     #
     # LLM Slop, don't know how this works
     @web_cursor.connect("add")
     def on_add_web(sel):
-        sel.annotation.set_text(sel.annotation.get_text().split("\n")[0])
+        sel.annotation.set_text(sel.annotation.get_text().split("\n")[0].strip())
 
     @spectrum_cursor.connect("add")
     def on_add_spectum(sel):
-        sel.annotation.set_text(sel.annotation.get_text().split("\n")[0])
+        sel.annotation.set_text(sel.annotation.get_text().split("\n")[0].strip())
 
     try:
         plt.show()
@@ -249,12 +256,14 @@ if __name__ == "__main__":
 
     # Not included in user input because idk I didn't want it there
     power_diff = -20  # Power difference between LO and IF/RF input
-    min_spur_level_dBc = -80  # Minimum displayed spur level
+    min_spur_level_dBc = -100  # Minimum displayed spur level
+    lo_suppression = -40  # isolation between L and R port on mixer
 
     plot_spurs(
         (if_start, if_stop),
         (rf_start, rf_stop),
         lo,
         power_diff,
+        lo_suppression,
         min_spur_level_dBc,
     )
