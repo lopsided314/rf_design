@@ -27,7 +27,7 @@ from signal_chain import noise_figure
 from signal_chain.rf_component import RFComponent
 from signal_chain.rf_signal import RFSignal
 
-from signal_chain.utils import sgc_str
+from signal_chain.utils import sgc_math, sgc_str
 
 
 class RFChain(noise_figure.NoiseFigureStage):
@@ -70,7 +70,11 @@ class RFChain(noise_figure.NoiseFigureStage):
         self.G_cas, self.F_cas, self.OIP3_cas = noise_figure.cascade_G_F(
             self.components
         )
-        super().__init__(self.G_cas[-1], self.F_cas[-1], self.OIP3_cas[-1])
+        super().__init__(
+            G=self.G_cas[-1],
+            F=self.F_cas[-1],
+            OIP3=self.OIP3_cas[-1],
+        )
 
         self.rf_in: RFSignal = RFSignal()
         self.rf_out: RFSignal = RFSignal()
@@ -105,20 +109,31 @@ class RFChain(noise_figure.NoiseFigureStage):
             str: Printable format of the component chain properties.
         """
 
-        rf_in = self.components[0].rf_in
-        rf_out = self.components[-1].rf_out
+        # Find the Spurious Free Dynamic Range
+        SFDR = (self.OIP3 / (self.rf_out.N * self.rf_out.BW)) ** (2 / 3)
+
+        # Find the maximum output power
+        S_clip: float = sgc_math.default_dBm()
+        for component in self.components:
+            S_clip = min(S_clip, component._Si_warn) * component.G
+
+        # Make the printout a little cleaner if there isn't an actual limit
+        if S_clip > 1e9:
+            S_clip = sgc_math.default_dBm()
 
         return (
             f"'{self.desc}' totals:\n"
             f"  G     = {sgc_str.sdB(self.G)} dB\n"
             f"  NF    = {sgc_str.sdB(self.F)} dB\n"
             f"  OIP3  = {sgc_str.sdBm(self.OIP3)} dBm\n"
-            f"  Si    = {sgc_str.sdBm(rf_in.S)} dBm\n"
-            f"  So    = {sgc_str.sdBm(rf_out.S)} dBm\n"
-            f"  Ni    = {sgc_str.sdBm(rf_in.N)} dBm/Hz\n"
-            f"  No    = {sgc_str.sdBm(rf_out.N)} dBm/Hz\n"
-            f"  SNR_i = {sgc_str.sdB(rf_in.SNR)} dB\n"
-            f"  SNR_o = {sgc_str.sdB(rf_out.SNR)} dB\n"
+            f"  OP1dB = {sgc_str.sdBm(S_clip)} dBm\n"
+            f"  Si    = {sgc_str.sdBm(self.rf_in.S)} dBm\n"
+            f"  So    = {sgc_str.sdBm(self.rf_out.S)} dBm\n"
+            f"  Ni    = {sgc_str.sdBm(self.rf_in.N)} dBm/Hz\n"
+            f"  No    = {sgc_str.sdBm(self.rf_out.N)} dBm/Hz\n"
+            f"  SNRi  = {sgc_str.sdB(self.rf_in.SNR)} dB\n"
+            f"  SNRo  = {sgc_str.sdB(self.rf_out.SNR)} dB\n"
+            f"  SFDR  = {sgc_str.sdB(SFDR)} dB\n"
             f"{'\n'.join(f'  Warning: {c.warning}' for c in self.components if c.warning)}\n"
         )
 

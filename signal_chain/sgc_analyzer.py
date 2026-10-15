@@ -213,7 +213,7 @@ def analyze_sections(
         rf_out = section.set_input(rf_out)
 
     # run calculation for full signal chain
-    G_cas, F_cas = noise_figure.cascade_G_F(sections)
+    G_cas, F_cas, _OIP3_cas = noise_figure.cascade_G_F(sections)
 
     #
     # generate report

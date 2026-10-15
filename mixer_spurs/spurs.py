@@ -118,7 +118,7 @@ def plot_spurs(
         suppression_cutoff (float): Mimimum spur level to show on plots
     """
 
-    order_multiples = (0,) + tuple(val for x in range(1, 8) for val in (x, -x))
+    order_multiples = (0,) + tuple(val for x in range(1, 6) for val in (x, -x))
 
     spur_levels: list[tuple[int, int, float]] = []
 
