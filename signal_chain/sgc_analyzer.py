@@ -256,6 +256,7 @@ def analyze_sections(
         f" ({sgc_str.sdBm(rf_out.N * rf_out.BW)} dBm/{BW_str})\n"
         f"SNR_i = {sgc_str.sdB(rf_in.SNR)} dB ({BW_str})\n"
         f"SNR_o = {sgc_str.sdB(rf_out.SNR)} dB ({BW_str})\n"
+        f"SFDR  = {sgc_str.sdB(sections[-1].SFDR)} dB ({BW_str})\n"
     )
 
     if filename:

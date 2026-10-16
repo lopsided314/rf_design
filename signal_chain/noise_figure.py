@@ -32,7 +32,7 @@ class NoiseFigureStage:
 
     G: float
     F: float
-    OIP3: float
+    OIP3: float = math.nan
 
     def __post_init__(self) -> None:
         """Verify parameters are valid.
@@ -67,7 +67,9 @@ def cascade_G_F(
         ValueError: No stages were provided.
 
     Returns:
-        A tuple of 2 lists, the cascaded gain G and the cascaded noise factor F.
+        A tuple of 3 lists: cascaded gain G, cascaded noise factor F, and
+        cascated OIP3.
+
         G = [G1,
              G1*G2,
              G1*G2*G3,
