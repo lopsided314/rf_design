@@ -33,10 +33,10 @@ HENDERSON = np.array(
 )
 
 #
-# Constants taken from the Marki Microwave online spur calculator.
+# Constants ripped from the Marki Microwave online spur calculator.
 #
 # 'L', 'M', 'N', and 'H' represent LO drive levels, specific to their own product
-# line - they make a MM1-0320LS and a MM1-0320HS
+# line, e.g. they make a MM1-0320LS and a MM1-0320HS
 #
 # L = +10 dBm
 # M = +13 dBm
@@ -135,7 +135,10 @@ def plot_spurs(
         if np.isnan(spur) or spur < suppression_cutoff or n_LO == m_RF == 0:
             continue
 
-        spur_levels.append((n_LO, m_RF, spur))
+        if m_RF == 0:
+            spur_levels.append((n_LO, m_RF, LO_suppression - Pdiff))
+        else:
+            spur_levels.append((n_LO, m_RF, spur))
 
     spur_levels.sort(key=lambda x: x[2], reverse=True)
 
@@ -155,30 +158,25 @@ def plot_spurs(
         ):
             continue
 
-        # If it is one of the LO multiples, make it a nice little arrow instead
+        label = f"LO {n_LO} x Input {m_RF}: {spur:.0f} dBc"
+        spur_web_ax.plot(input_freqs, (mixed_start, mixed_end), label=label)
+
+        # If it is one of the LO harmonics, make it a nice little arrow instead
         # of the highlighted span
         if m_RF == 0:
-            label = f"LO {n_LO} x Input {m_RF}: {LO_suppression:.0f} dBc"
-
-            spur_web_ax.plot(input_freqs, (mixed_start, mixed_end), label=label)
-
             spectrum_ax.plot(
                 (mixed_start, mixed_end),
-                (suppression_cutoff, LO_suppression),
+                (suppression_cutoff, spur),
                 label=label,
             )
             spectrum_ax.plot(
                 mixed_end,
-                LO_suppression,
+                spur,
                 marker="^",
                 markeredgecolor=spectrum_ax.lines[-1].get_color(),
                 markerfacecolor=spectrum_ax.lines[-1].get_color(),
             )
         else:
-            label = f"LO {n_LO} x Input {m_RF}: {spur:.0f} dBc"
-
-            spur_web_ax.plot(input_freqs, (mixed_start, mixed_end), label=label)
-
             spectrum_ax.plot(
                 (mixed_start, mixed_end),
                 (spur, spur),
@@ -192,15 +190,13 @@ def plot_spurs(
                 color=spectrum_ax.lines[-1].get_color(),
             )
 
-    input_desc = f"LO = {LO} GHz, $\\Delta$P = {Pdiff} dB"
-
     spur_web_ax.set_xlim(input_freqs)
     spur_web_ax.set_ylim(output_freqs)
     spur_web_ax.set_xlabel("Input Frequency [GHz]")
     spur_web_ax.set_ylabel("Output Frequency [GHz]")
     spur_web_ax.grid()
     spur_web_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    spur_web_ax.set_title(f"Spur Web: {input_desc}")
+    spur_web_ax.set_title(f"Spur Web: LO = {LO}, $\\Delta$P = {Pdiff} dB")
     spur_web_fig.tight_layout()
 
     spectrum_ax.set_xlim(output_freqs)
@@ -209,7 +205,9 @@ def plot_spurs(
     spectrum_ax.set_ylabel("Spur Level [dBc]")
     spectrum_ax.grid()
     spectrum_ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    spectrum_ax.set_title(f"Spur Spectrum: {input_desc}")
+    spectrum_ax.set_title(
+        f"Spur Spectrum: In = {input_freqs}, LO = {LO}, $\\Delta$P = {Pdiff} dB"
+    )
     spectrum_fig.tight_layout()
 
     # Activate hover annotations
