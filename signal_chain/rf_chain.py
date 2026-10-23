@@ -67,7 +67,7 @@ class RFChain(noise_figure.NoiseFigureStage):
         self.components: list[RFComponent] = list(copy.deepcopy(components))
         self.desc: str = desc
 
-        self.G_cas, self.F_cas, self.OIP3_cas = noise_figure.cascade_G_F(
+        self.G_cas, self.F_cas, self.OIP3_cas = noise_figure.cascade_G_F_3(
             self.components
         )
         super().__init__(

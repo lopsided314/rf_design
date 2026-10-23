@@ -52,7 +52,7 @@ class NoiseFigureStage:
             raise ValueError("Stage has invalid parameters")
 
 
-def cascade_G_F(
+def cascade_G_F_3(
     stages: Sequence[NoiseFigureStage],
 ) -> tuple[list[float], list[float], list[float]]:
     """Compute the cascaded Gain, Noise Factor, and Output Third Order

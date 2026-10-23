@@ -58,6 +58,7 @@ def _generate_inlined_text(
     sections: Sequence[RFChain | RFComponent],
     G_cas: list[float],
     F_cas: list[float],
+    OIP3_cas: list[float],
 ) -> str:
     """Format signal chain output.
 
@@ -68,6 +69,7 @@ def _generate_inlined_text(
         sections (Sequence[RFChain | RFComponent]): sequence of signal chain parts
         G_cas (list[float]): Cascaded gain of signal chain.
         F_cas (list[float]): Cascaded noise factor of signal chain.
+        OIP3_cas (list[float]): Cascaded third order intercept point.
 
     Returns:
         str: values formatted into printable string.
@@ -91,10 +93,11 @@ def _generate_inlined_text(
     accum_params: dict[str, list[str]] = {
         "G tot": [],
         "NF tot": [],
+        "OIP3 tot": [],
         "SNR loss": [],
     }
 
-    # figure out the width of each column
+    # figure out the width of the starting column
     param_name_width: int = max(
         max(len(param) for param in stage_params),
         max(len(param) for param in accum_params),
@@ -102,8 +105,11 @@ def _generate_inlined_text(
 
     col_widths: list[int] = []
 
-    for section, G, F in zip(sections, G_cas, F_cas):
+    for section, G, F, OIP3 in zip(sections, G_cas, F_cas, OIP3_cas):
 
+        # set the column width for this section to fit both the name of the
+        # section and the max possible number of characters in the string
+        # conversion
         col_widths.append(max(len(section.desc), len(sgc_str.sdB(1))))
 
         stage_params["Name"].append(section.desc)
@@ -121,6 +127,7 @@ def _generate_inlined_text(
 
         accum_params["G tot"].append(sgc_str.sdB(G))
         accum_params["NF tot"].append(sgc_str.sdB(F))
+        accum_params["OIP3 tot"].append(sgc_str.sdB(OIP3))
         accum_params["SNR loss"].append(
             sgc_str.sdB(sections[0].rf_in.SNR / section.rf_out.SNR)
         )
@@ -216,7 +223,7 @@ def analyze_sections(
         rf_out = section.set_input(rf_out)
 
     # run calculation for full signal chain
-    G_cas, F_cas, _OIP3_cas = noise_figure.cascade_G_F(sections)
+    G_cas, F_cas, OIP3_cas = noise_figure.cascade_G_F_3(sections)
 
     #
     # generate report
@@ -228,11 +235,14 @@ def analyze_sections(
                 section.components,
                 section.G_cas,
                 section.F_cas,
+                section.OIP3_cas,
             )
         )
         report.append("\n" + section.status())
 
-    report.append("All sections:\n" + _generate_inlined_text(sections, G_cas, F_cas))
+    report.append(
+        "All sections:\n" + _generate_inlined_text(sections, G_cas, F_cas, OIP3_cas)
+    )
 
     if BW >= 1e9:
         BW_str: str = f"{BW/1e9:.2f} GHz"
